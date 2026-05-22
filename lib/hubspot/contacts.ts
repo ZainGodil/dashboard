@@ -21,27 +21,50 @@ interface HubSpotContact {
   properties: Record<string, string | null>
 }
 
-interface SearchResponse {
+interface ListResponse {
   results: HubSpotContact[]
   paging?: { next?: { after: string } }
+}
+
+interface SearchResponse extends ListResponse {
   total: number
 }
 
-export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
+// Full refresh: use the list endpoint (higher rate limit than search)
+async function fetchAllContactsList(): Promise<HubSpotContact[]> {
   const all: HubSpotContact[] = []
   let after: string | undefined
 
-  const filters = afterDate
-    ? [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: afterDate.toISOString() }]
-    : []
+  do {
+    const params = new URLSearchParams({
+      limit: '100',
+      properties: CONTACT_PROPERTIES.join(','),
+    })
+    if (after) params.set('after', after)
+
+    const data = await hubspotFetch<ListResponse>(`/crm/v3/objects/contacts?${params}`)
+    all.push(...data.results)
+    after = data.paging?.next?.after
+    if (after) await sleep(300)
+  } while (after)
+
+  return all
+}
+
+// Incremental sync: use search to filter by lastmodifieddate
+async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
+  const all: HubSpotContact[] = []
+  let after: string | undefined
 
   do {
     const body: Record<string, unknown> = {
       limit: 100,
       properties: CONTACT_PROPERTIES,
       sorts: [{ propertyName: 'createdate', direction: 'DESCENDING' }],
+      filterGroups: [{
+        filters: [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: afterDate.toISOString() }],
+      }],
     }
-    if (filters.length) body.filterGroups = [{ filters }]
     if (after) body.after = after
 
     const data = await hubspotFetch<SearchResponse>('/crm/v3/objects/contacts/search', {
@@ -55,4 +78,8 @@ export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact
   } while (after)
 
   return all
+}
+
+export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
+  return afterDate ? fetchContactsSince(afterDate) : fetchAllContactsList()
 }
