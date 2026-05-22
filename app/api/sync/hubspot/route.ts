@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-export const maxDuration = 60
+import { after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
@@ -8,22 +7,30 @@ import { fetchOwnerMap } from '@/lib/hubspot/owners'
 import { mapUniversity, mapCourse, mapSegment, isEnrolled, isViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
 import { recomputeCacMetrics, recomputeRollingMetrics } from '@/lib/metrics/compute-cac'
 
+export const maxDuration = 60
+
 export async function GET(req: NextRequest) {
-  // Validate cron secret (skip in dev)
   const secret = req.headers.get('x-cron-secret')
   if (process.env.NODE_ENV === 'production' && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
-  const startedAt = new Date().toISOString()
   const isFullRefresh = req.nextUrl.searchParams.get('full') === '1'
 
+  // Respond immediately; run sync in background via after()
+  after(async () => {
+    await runSync(isFullRefresh)
+  })
+
+  return NextResponse.json({ status: 'sync started', full: isFullRefresh })
+}
+
+async function runSync(isFullRefresh: boolean) {
+  const supabase = createServiceClient()
+  const startedAt = new Date().toISOString()
   let recordsSynced = 0
-  let errorMessage: string | null = null
 
   try {
-    // Determine incremental cutoff
     let afterDate: Date | undefined
     if (!isFullRefresh) {
       const { data: lastLog } = await supabase
@@ -37,21 +44,18 @@ export async function GET(req: NextRequest) {
       if (lastLog?.completed_at) afterDate = new Date(lastLog.completed_at)
     }
 
-    // Fetch owners and enrolled deal contact IDs in parallel
     const [ownerMap, enrolledDealContactIds] = await Promise.all([
       fetchOwnerMap(),
       fetchEnrolledContactIds(),
     ])
 
-    // Fetch contacts
     const contacts = await fetchAllContacts(afterDate)
 
     if (!contacts.length) {
       await writeSyncLog(supabase, startedAt, 0, 'success', null)
-      return NextResponse.json({ synced: 0, message: 'No contacts to sync' })
+      return
     }
 
-    // Map contacts to DB rows
     const rows = contacts.map((c) => {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.b2he)
@@ -81,7 +85,6 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Upsert in batches of 500
     const BATCH = 500
     for (let i = 0; i < rows.length; i += BATCH) {
       const { error } = await supabase
@@ -91,7 +94,6 @@ export async function GET(req: NextRequest) {
     }
     recordsSynced = rows.length
 
-    // Upsert enrollments for newly enrolled contacts
     const enrolledRows = rows
       .filter((r) => r.enrolled)
       .map((r) => ({
@@ -105,7 +107,6 @@ export async function GET(req: NextRequest) {
       }))
 
     if (enrolledRows.length) {
-      // Need contact UUIDs — fetch them back
       const hubspotIds = enrolledRows.map((r) => r.hubspot_contact_id)
       const { data: contactRecords } = await supabase
         .from('contacts')
@@ -125,25 +126,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Recompute CAC metrics for affected months
     const monthSet = new Set<string>()
     for (const r of rows) {
       if (r.create_date) monthSet.add(formatMonth(r.create_date))
     }
-    const months = Array.from(monthSet)
-    await recomputeCacMetrics(months)
+    await recomputeCacMetrics(Array.from(monthSet))
 
-    // Full nightly refresh also recomputes rolling metrics
     if (isFullRefresh) await recomputeRollingMetrics()
 
     await writeSyncLog(supabase, startedAt, recordsSynced, 'success', null)
-    return NextResponse.json({ synced: recordsSynced, months })
-
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err)
+    const errorMessage = err instanceof Error ? err.message : String(err)
     await writeSyncLog(supabase, startedAt, recordsSynced, 'error', errorMessage)
     console.error('[hubspot sync]', errorMessage)
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 

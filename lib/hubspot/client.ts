@@ -17,7 +17,7 @@ export async function hubspotFetch<T>(path: string, options: RequestInit = {}, r
 
   if (res.status === 429 && retries > 0) {
     const retryAfter = res.headers.get('Retry-After')
-    const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1500
+    const delay = Math.min(retryAfter ? parseInt(retryAfter, 10) * 1000 : 1500, 3000)
     await sleep(delay)
     return hubspotFetch<T>(path, options, retries - 1)
   }
