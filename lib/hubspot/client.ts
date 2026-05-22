@@ -8,6 +8,7 @@ export async function hubspotFetch<T>(path: string, options: RequestInit = {}, r
 
   const res = await fetch(`${BASE}${path}`, {
     ...options,
+    signal: AbortSignal.timeout(25000),
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

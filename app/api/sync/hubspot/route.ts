@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
@@ -15,20 +14,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const isFullRefresh = req.nextUrl.searchParams.get('full') === '1'
-
-  // Respond immediately; run sync in background via after()
-  after(async () => {
-    await runSync(isFullRefresh)
-  })
-
-  return NextResponse.json({ status: 'sync started', full: isFullRefresh })
-}
-
-async function runSync(isFullRefresh: boolean) {
   const supabase = createServiceClient()
   const startedAt = new Date().toISOString()
+  const isFullRefresh = req.nextUrl.searchParams.get('full') === '1'
+
   let recordsSynced = 0
+  let errorMessage: string | null = null
 
   try {
     let afterDate: Date | undefined
@@ -53,7 +44,7 @@ async function runSync(isFullRefresh: boolean) {
 
     if (!contacts.length) {
       await writeSyncLog(supabase, startedAt, 0, 'success', null)
-      return
+      return NextResponse.json({ synced: 0, message: 'No contacts to sync' })
     }
 
     const rows = contacts.map((c) => {
@@ -135,10 +126,13 @@ async function runSync(isFullRefresh: boolean) {
     if (isFullRefresh) await recomputeRollingMetrics()
 
     await writeSyncLog(supabase, startedAt, recordsSynced, 'success', null)
+    return NextResponse.json({ synced: recordsSynced, months: Array.from(monthSet) })
+
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err)
+    errorMessage = err instanceof Error ? err.message : String(err)
     await writeSyncLog(supabase, startedAt, recordsSynced, 'error', errorMessage)
     console.error('[hubspot sync]', errorMessage)
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
