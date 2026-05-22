@@ -78,5 +78,10 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
 }
 
 export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
-  return afterDate ? fetchContactsSince(afterDate) : fetchAllContactsList()
+  if (afterDate) return fetchContactsSince(afterDate)
+  // Full refresh: limit to last 24 months so the function stays within Vercel's 60s limit.
+  // The incremental cron will keep data current; older contacts rarely affect dashboard metrics.
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 24)
+  return fetchContactsSince(cutoff)
 }
