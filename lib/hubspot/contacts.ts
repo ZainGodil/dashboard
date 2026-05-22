@@ -43,7 +43,6 @@ async function fetchAllContactsList(): Promise<HubSpotContact[]> {
     const data = await hubspotFetch<ListResponse>(`/crm/v3/objects/contacts?${params}`)
     all.push(...data.results)
     after = data.paging?.next?.after
-    if (after) await sleep(300)
   } while (after)
 
   return all

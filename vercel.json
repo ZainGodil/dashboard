@@ -2,5 +2,8 @@
   "crons": [
     { "path": "/api/sync/hubspot", "schedule": "0 1 * * *" },
     { "path": "/api/sync/ads",     "schedule": "0 2 * * *" }
-  ]
+  ],
+  "functions": {
+    "app/api/sync/hubspot/route.ts": { "maxDuration": 60 }
+  }
 }
