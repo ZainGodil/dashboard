@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/sync/hubspot", "schedule": "0 */2 9-18 * *" },
+    { "path": "/api/sync/ads",     "schedule": "0 2 * * *" }
+  ]
+}
