@@ -36,10 +36,8 @@ async function fetchAllContactsList(): Promise<HubSpotContact[]> {
   let after: string | undefined
 
   do {
-    const params = new URLSearchParams({
-      limit: '100',
-      properties: CONTACT_PROPERTIES.join(','),
-    })
+    const params = new URLSearchParams({ limit: '100' })
+    for (const p of CONTACT_PROPERTIES) params.append('properties', p)
     if (after) params.set('after', after)
 
     const data = await hubspotFetch<ListResponse>(`/crm/v3/objects/contacts?${params}`)
