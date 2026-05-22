@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+export const maxDuration = 60
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
