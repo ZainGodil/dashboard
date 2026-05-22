@@ -1,6 +1,8 @@
 const BASE = 'https://api.hubapi.com'
 
-export async function hubspotFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export async function hubspotFetch<T>(path: string, options: RequestInit = {}, retries = 4): Promise<T> {
   const token = process.env.HUBSPOT_ACCESS_TOKEN
   if (!token) throw new Error('HUBSPOT_ACCESS_TOKEN is not set')
 
@@ -12,6 +14,13 @@ export async function hubspotFetch<T>(path: string, options: RequestInit = {}): 
       ...options.headers,
     },
   })
+
+  if (res.status === 429 && retries > 0) {
+    const retryAfter = res.headers.get('Retry-After')
+    const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 1500
+    await sleep(delay)
+    return hubspotFetch<T>(path, options, retries - 1)
+  }
 
   if (!res.ok) {
     const text = await res.text()

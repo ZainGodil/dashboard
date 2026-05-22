@@ -1,5 +1,7 @@
 import { hubspotFetch } from './client'
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 export const CONTACT_PROPERTIES = [
   'firstname',
   'lastname',
@@ -49,6 +51,7 @@ export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact
 
     all.push(...data.results)
     after = data.paging?.next?.after
+    if (after) await sleep(300)
   } while (after)
 
   return all
