@@ -30,7 +30,8 @@ interface SearchResponse extends ListResponse {
   total: number
 }
 
-// Full refresh: use the list endpoint (higher rate limit than search)
+// Full refresh: kept for potential future use (list endpoint, no filter)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchAllContactsList(): Promise<HubSpotContact[]> {
   const all: HubSpotContact[] = []
   let after: string | undefined
@@ -71,7 +72,7 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
 
     all.push(...data.results)
     after = data.paging?.next?.after
-    if (after) await sleep(300)
+    if (after) await sleep(150)
   } while (after)
 
   return all
@@ -79,6 +80,8 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
 
 export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
   if (afterDate) return fetchContactsSince(afterDate)
-  // Full refresh: use list endpoint (no filter body, higher rate limit than search).
-  return fetchAllContactsList()
+  // Full refresh: last 24 months via search. maxDuration=300 on sync route gives enough headroom.
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - 24)
+  return fetchContactsSince(cutoff)
 }

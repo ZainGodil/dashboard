@@ -6,11 +6,20 @@ import { fetchOwnerMap } from '@/lib/hubspot/owners'
 import { mapUniversity, mapCourse, mapSegment, isEnrolled, isViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
 import { recomputeCacMetrics, recomputeRollingMetrics } from '@/lib/metrics/compute-cac'
 
-export const maxDuration = 60
+export const maxDuration = 300
+
+function isAuthorized(req: NextRequest): boolean {
+  if (process.env.NODE_ENV !== 'production') return true
+  const s = process.env.CRON_SECRET
+  // Vercel cron sends: Authorization: Bearer <secret>
+  if (req.headers.get('authorization') === `Bearer ${s}`) return true
+  // Manual curl trigger: x-cron-secret header
+  if (req.headers.get('x-cron-secret') === s) return true
+  return false
+}
 
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (process.env.NODE_ENV === 'production' && secret !== process.env.CRON_SECRET) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
