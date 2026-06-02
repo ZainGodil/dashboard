@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { fetchGoals } from '@/lib/hubspot/goals'
 import type { GoalRecord } from '@/lib/hubspot/goals'
 import type { Period } from '@/lib/metrics/periods'
@@ -139,7 +139,7 @@ export default async function SalesKpisPage({
   const is90d = period === '90d'
   const months = getPeriodMonths(period)
   const ytdMonths = getYtdMonths()
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
 
   const [bookingsRes, pipelineRes, ytdRes, goals] = await Promise.all([
     is90d

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import FunnelMatrix from './FunnelMatrix'
 import BySourceTabs from './BySourceTabs'
 import StatCard from '@/components/ui/StatCard'
@@ -65,7 +65,7 @@ function incrementCounts(counts: Record<string, number>, c: ContactRow) {
 }
 
 export default async function FunnelPage() {
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
 
   const { data: contacts } = await supabase
     .from('contacts')

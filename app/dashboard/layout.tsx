@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/layout/Sidebar'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // Fetch latest successful sync timestamps (best-effort)
   let syncInfo: { hubspot?: string; ads?: string } = {}
   try {
-    const svc = createServiceClient()
+    const svc = createAdminClient()
     const { data } = await svc
       .from('sync_log')
       .select('source, completed_at')

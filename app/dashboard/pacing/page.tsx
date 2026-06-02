@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getLast12Months } from '@/lib/metrics/periods'
 import { fetchGoals, goalsForMonth } from '@/lib/hubspot/goals'
 import DailyLeadsChart from './DailyLeadsChart'
@@ -22,7 +22,7 @@ function ragStatus(actual: number, target: number, paceRatio: number): RagStatus
 }
 
 export default async function PacingPage() {
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
 
   const today = new Date()
   const year = today.getFullYear()

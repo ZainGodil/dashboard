@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { getMonthsForPeriod, getLast6Months, getLast12Months, type Period } from '@/lib/metrics/periods'
 import StatCard from '@/components/ui/StatCard'
 import SbuCard from '@/components/ui/SbuCard'
@@ -47,7 +47,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const period = (searchParams.period ?? 'mtd') as Period
   const university = searchParams.university ?? ''
   const segment = searchParams.segment ?? ''
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
 
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
