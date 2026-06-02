@@ -31,6 +31,7 @@ interface SearchResponse extends ListResponse {
 }
 
 // Full refresh: use the list endpoint (higher rate limit than search)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchAllContactsList(): Promise<HubSpotContact[]> {
   const all: HubSpotContact[] = []
   let after: string | undefined
@@ -59,7 +60,7 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
       properties: CONTACT_PROPERTIES,
       sorts: [{ propertyName: 'createdate', direction: 'DESCENDING' }],
       filterGroups: [{
-        filters: [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: afterDate.toISOString() }],
+        filters: [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: String(afterDate.getTime()) }],
       }],
     }
     if (after) body.after = after
