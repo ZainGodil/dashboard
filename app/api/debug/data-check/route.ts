@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     .not('month', 'is', null)
     .limit(5)
 
-  const { data: nullMonthCount } = await supabase
+  const { count: nullMonthCount } = await supabase
     .from('contacts')
     .select('*', { count: 'exact', head: true })
     .is('month', null)
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     supabase_url: process.env.NEXT_PUBLIC_SUPABASE_URL,
     contacts_total: contactsTotal,
-    contacts_null_month: (nullMonthCount as any)?.count ?? null,
+    contacts_null_month: nullMonthCount,
     contacts_month_sample: monthSample?.map(r => r.month),
     jun26: { total: jun26Total, viable: jun26Viable, enrolled: jun26Enrolled },
     cac_by_month: cacByMonth,
