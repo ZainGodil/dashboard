@@ -1,8 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+
+interface SyncInfo {
+  hubspot?: string
+  ads?: string
+}
 
 const NAV = [
   {
@@ -49,9 +55,18 @@ const NAV = [
   },
 ]
 
-export default function Sidebar() {
+function relativeTime(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -60,10 +75,10 @@ export default function Sidebar() {
     router.refresh()
   }
 
-  return (
-    <aside className="w-56 flex flex-col bg-slate-800 shrink-0">
+  const navContent = (
+    <>
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-slate-700">
+      <div className="px-4 py-5 border-b border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-display text-[11px] font-extrabold text-white tracking-tight">
             WI
@@ -73,6 +88,16 @@ export default function Sidebar() {
             <div className="text-[10px] text-slate-500 uppercase tracking-widest">Analytics</div>
           </div>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-200"
+          aria-label="Close menu"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 1l12 12M13 1L1 13"/>
+          </svg>
+        </button>
       </div>
 
       {/* Nav */}
@@ -84,6 +109,7 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium mb-0.5 transition-all border ${
                 active
                   ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
@@ -103,7 +129,28 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-4 border-t border-slate-700">
+      <div className="px-3 py-4 border-t border-slate-700 space-y-3">
+        {/* Sync status */}
+        {(syncInfo?.hubspot || syncInfo?.ads) && (
+          <div className="px-3 space-y-1">
+            <div className="text-[9px] uppercase tracking-widest text-slate-600 font-semibold">Last synced</div>
+            {syncInfo.hubspot && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                <span className="text-[10px] text-slate-500">HubSpot</span>
+                <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(syncInfo.hubspot)}</span>
+              </div>
+            )}
+            {syncInfo.ads && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                <span className="text-[10px] text-slate-500">Ads</span>
+                <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(syncInfo.ads)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           onClick={handleSignOut}
           className="w-full text-left px-3 py-2 rounded-lg text-[12px] text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-colors"
@@ -111,6 +158,44 @@ export default function Sidebar() {
           Sign out
         </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open menu"
+        className="md:hidden fixed top-3 left-3 z-50 w-9 h-9 bg-slate-800 rounded-lg flex items-center justify-center text-slate-300 hover:text-white shadow-lg"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+      </button>
+
+      {/* Backdrop */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={[
+          'flex flex-col bg-slate-800 shrink-0 h-full',
+          // Desktop: always visible, in flow
+          'md:relative md:w-56 md:translate-x-0',
+          // Mobile: fixed overlay, slide in/out
+          'fixed inset-y-0 left-0 z-50 w-64',
+          'transition-transform duration-200 ease-in-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        ].join(' ')}
+      >
+        {navContent}
+      </aside>
+    </>
   )
 }
