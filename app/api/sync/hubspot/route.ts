@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
 
   let recordsSynced = 0
   let errorMessage: string | null = null
+  let step = 'init'
 
   try {
     let afterDate: Date | undefined
@@ -44,11 +45,11 @@ export async function GET(req: NextRequest) {
       if (lastLog?.completed_at) afterDate = new Date(lastLog.completed_at)
     }
 
-    const [ownerMap, enrolledDealContactIds] = await Promise.all([
-      fetchOwnerMap(),
-      fetchEnrolledContactIds(),
-    ])
-
+    step = 'owners'
+    const ownerMap = await fetchOwnerMap()
+    step = 'deals'
+    const enrolledDealContactIds = await fetchEnrolledContactIds()
+    step = 'contacts'
     const contacts = await fetchAllContacts(afterDate)
 
     if (!contacts.length) {
@@ -138,7 +139,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ synced: recordsSynced, months: Array.from(monthSet) })
 
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err)
+    const base = err instanceof Error ? err.message : String(err)
+    errorMessage = `[step=${step}] ${base}`
     await writeSyncLog(supabase, startedAt, recordsSynced, 'error', errorMessage)
     console.error('[hubspot sync]', errorMessage)
     return NextResponse.json({ error: errorMessage }, { status: 500 })
