@@ -31,7 +31,6 @@ interface SearchResponse extends ListResponse {
 }
 
 // Full refresh: use the list endpoint (higher rate limit than search)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchAllContactsList(): Promise<HubSpotContact[]> {
   const all: HubSpotContact[] = []
   let after: string | undefined
@@ -80,9 +79,6 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
 
 export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
   if (afterDate) return fetchContactsSince(afterDate)
-  // Full refresh: limit to last 24 months so the function stays within Vercel's 60s limit.
-  // The incremental cron will keep data current; older contacts rarely affect dashboard metrics.
-  const cutoff = new Date()
-  cutoff.setMonth(cutoff.getMonth() - 24)
-  return fetchContactsSince(cutoff)
+  // Full refresh: use list endpoint (no filter body, higher rate limit than search).
+  return fetchAllContactsList()
 }
