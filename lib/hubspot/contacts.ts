@@ -56,14 +56,14 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
   return all
 }
 
-// Date-range fetch: contacts with createdate between from and to (used for monthly chunks)
+// Date-range fetch: contacts with createdate between from and to (monthly chunks for full refresh)
 async function fetchContactsInRange(from: Date, to: Date): Promise<HubSpotContact[]> {
   const all: HubSpotContact[] = []
   let after: string | undefined
 
   do {
     const body: Record<string, unknown> = {
-      limit: 100,
+      limit: 200,
       properties: CONTACT_PROPERTIES,
       filterGroups: [{
         filters: [
@@ -81,7 +81,7 @@ async function fetchContactsInRange(from: Date, to: Date): Promise<HubSpotContac
 
     all.push(...data.results)
     after = data.paging?.next?.after
-    if (after) await sleep(150)
+    if (after) await sleep(100)
   } while (after)
 
   return all
@@ -90,12 +90,13 @@ async function fetchContactsInRange(from: Date, to: Date): Promise<HubSpotContac
 export async function fetchAllContacts(afterDate?: Date): Promise<HubSpotContact[]> {
   if (afterDate) return fetchContactsSince(afterDate)
 
-  // Full refresh: chunk by month to stay under HubSpot search API's 10,000-result limit.
-  // ~1,700 contacts/month avg for this portal, well under the limit per chunk.
+  // Full refresh: last 6 months in monthly chunks to fit Vercel 60s limit.
+  // Incremental cron keeps data current; extend MONTHS_BACK for historical backfill runs.
+  const MONTHS_BACK = 6
   const all: HubSpotContact[] = []
   const now = new Date()
 
-  for (let monthsBack = 24; monthsBack >= 0; monthsBack--) {
+  for (let monthsBack = MONTHS_BACK; monthsBack >= 0; monthsBack--) {
     const from = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1)
     const to = monthsBack === 0
       ? now
