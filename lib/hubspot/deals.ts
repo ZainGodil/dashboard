@@ -1,6 +1,10 @@
 import { hubspotFetch } from './client'
 
-const ENROLLED_STAGE = 'Signed Promissory Note / Closed Won'
+const ENROLLED_STAGES = new Set([
+  'Signed Promissory Note / Closed Won',
+  'Signed Promissory Note / Closed Won (B2C Interview)',
+  'Invoice Sent (B2C Interview)',
+])
 
 interface Deal {
   id: string
@@ -29,7 +33,7 @@ export async function fetchEnrolledContactIds(): Promise<Map<string, string | nu
     const data = await hubspotFetch<DealsResponse>(`/crm/v3/objects/deals?${params}`)
 
     for (const deal of data.results) {
-      if (deal.properties.dealstage === ENROLLED_STAGE) {
+      if (ENROLLED_STAGES.has(deal.properties.dealstage ?? '')) {
         const closedate = deal.properties.closedate ?? null
         const contacts = deal.associations?.contacts?.results ?? []
         for (const c of contacts) {

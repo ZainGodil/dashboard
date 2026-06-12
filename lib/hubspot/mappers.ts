@@ -38,9 +38,16 @@ export function mapSegment(sourceData2: string | null | undefined): { segment: S
   return { segment: 'B2C', salesSegment: 'B2HE' }
 }
 
+const ENROLLED_LEAD_STATUSES = new Set([
+  'Student',
+  'Signed Promissory Note / Closed Won',
+  'Signed Promissory Note / Closed Won (B2C Interview)',
+  'Invoice Sent (B2C Interview)',
+])
+
 export function isEnrolled(leadStatus: string | null | undefined): boolean {
   if (!leadStatus) return false
-  return leadStatus === 'Student' || leadStatus === 'Signed Promissory Note / Closed Won'
+  return ENROLLED_LEAD_STATUSES.has(leadStatus)
 }
 
 export function isViable(leadStatus: string | null | undefined): boolean {
