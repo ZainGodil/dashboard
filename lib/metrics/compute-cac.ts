@@ -72,8 +72,10 @@ export async function recomputeCacMetrics(months: string[]): Promise<void> {
     if (rows.length) {
       // Delete existing rows for this month before inserting — upsert cannot deduplicate
       // rows where nullable columns (university, source) differ only by NULL vs NULL.
-      await supabase.from('cac_metrics').delete().eq('month', month)
-      await supabase.from('cac_metrics').insert(rows)
+      const { error: delErr } = await supabase.from('cac_metrics').delete().eq('month', month)
+      if (delErr) throw new Error(`cac_metrics delete failed for ${month}: ${delErr.message}`)
+      const { error: insErr } = await supabase.from('cac_metrics').insert(rows)
+      if (insErr) throw new Error(`cac_metrics insert failed for ${month}: ${insErr.message}`)
     }
   }
 }
