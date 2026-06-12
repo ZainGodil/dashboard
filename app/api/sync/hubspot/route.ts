@@ -82,6 +82,17 @@ export async function GET(req: NextRequest) {
     }
     recordsSynced = rows.length
 
+    // Remove contacts that are no longer in the list (orphans from previous syncs)
+    const syncedIds = new Set(rows.map((r) => r.hubspot_id))
+    const affectedMonths = Array.from(new Set(rows.map((r) => r.month).filter(Boolean))) as string[]
+    for (const month of affectedMonths) {
+      const { data: existing } = await supabase.from('contacts').select('hubspot_id').eq('month', month)
+      const orphans = (existing ?? []).map((r) => r.hubspot_id).filter((id) => !syncedIds.has(id))
+      if (orphans.length) {
+        await supabase.from('contacts').delete().in('hubspot_id', orphans)
+      }
+    }
+
     const enrolledRows = rows
       .filter((r) => r.enrolled)
       .map((r) => ({
