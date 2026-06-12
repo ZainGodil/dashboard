@@ -25,7 +25,7 @@ export default function GaugeCard({
   const trackPath = `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy}`
   // Fill: always largeArc=0 because the fill arc is always ≤ 180°
   const fillPath = pct > 0.001
-    ? `M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${endX} ${endY}`
+    ? `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${endX} ${endY}`
     : ''
   const maxLabel = formatMax ?? String(max)
 
