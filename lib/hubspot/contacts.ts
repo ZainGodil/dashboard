@@ -3,7 +3,7 @@ import { hubspotFetch } from './client'
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // HubSpot list that contains all B2C + WFD leads (maintained in HubSpot UI)
-export const LEADS_LIST_ID = '5711'
+export const LEADS_LIST_ID = '3314' // v1 list ID (ILS segment ID: 5711)
 
 export const CONTACT_PROPERTIES = [
   'firstname',
