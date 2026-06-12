@@ -140,7 +140,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
           const diff = (new Date(e.enrolled_at).getTime() - new Date(createDate).getTime()) / 86_400_000
           return diff
         })
-        .filter((d): d is number => d !== null && d > 0 && d < 365)
+        .filter((d): d is number => d !== null && d >= 0 && d < 365)
       const avg = validDays.length > 0 ? validDays.reduce((a, b) => a + b, 0) / validDays.length : 0
       return { month, days: Math.round(avg) }
     })
@@ -149,13 +149,15 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   // ── Monthly CAC by segment ───────────────────────────────────────────
   const monthlyCacData = last12.map((month) => {
     const rows = (monthlyCacRaw ?? []).filter((r) => r.month === month)
-    const segCac = (seg: string) => {
+    const segData = (seg: string) => {
       const sr = rows.filter((r) => r.segment === seg)
       const spend = sr.reduce((s, r) => s + Number(r.spend), 0)
       const enroll = sr.reduce((s, r) => s + r.enrollments, 0)
-      return enroll > 0 ? Math.round(spend / enroll) : 0
+      return { cac: enroll > 0 ? Math.round(spend / enroll) : 0, enroll }
     }
-    return { month, B2C: segCac('B2C'), WFD: segCac('WFD') }
+    const b2c = segData('B2C')
+    const wfd = segData('WFD')
+    return { month, B2C: b2c.cac, WFD: wfd.cac, B2C_enroll: b2c.enroll, WFD_enroll: wfd.enroll }
   })
 
   // ── Aggregate chart data ─────────────────────────────────────────
@@ -261,7 +263,7 @@ interface ContentProps {
   dailyData: DayPoint[]
   currentMonthLabel: string
   salesCycleData: { month: string; days: number }[]
-  monthlyCacData: { month: string; B2C: number; WFD: number }[]
+  monthlyCacData: { month: string; B2C: number; WFD: number; B2C_enroll: number; WFD_enroll: number }[]
 }
 
 // ── Content component ────────────────────────────────────────────────────────
