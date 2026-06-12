@@ -28,6 +28,11 @@ interface CampaignRow {
 export async function fetchCampaignPerformance(
   sinceDays: number = 30
 ): Promise<CampaignRow[]> {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - sinceDays)
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+
   const query = `
     SELECT
       campaign.name,
@@ -36,7 +41,7 @@ export async function fetchCampaignPerformance(
       metrics.clicks,
       segments.date
     FROM campaign
-    WHERE segments.date DURING LAST_${sinceDays}_DAYS
+    WHERE segments.date BETWEEN '${fmt(start)}' AND '${fmt(end)}'
       AND campaign.status = 'ENABLED'
     ORDER BY segments.date DESC
   `.trim()
