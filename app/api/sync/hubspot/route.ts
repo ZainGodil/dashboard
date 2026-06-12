@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
     step = 'deals'
     const enrolledDealContactIds = await fetchEnrolledContactIds()
     step = 'contacts'
+    // fetchAllContacts already filters by advisor owner list and excludes b2b=true at the API level
     const contacts = await fetchAllContacts(afterDate)
 
     if (!contacts.length) {
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     const rows = contacts.map((c) => {
       const p = c.properties
-      const { segment, salesSegment } = mapSegment(p.b2he)
+      const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
       const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
       const viable = isViable(p.hs_lead_status)
       const university = mapUniversity(p.pick_university ?? p.university)

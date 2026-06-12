@@ -27,9 +27,13 @@ export function mapCourse(program: string | null | undefined): Course {
   return 'General'
 }
 
-export function mapSegment(b2he: string | null | undefined): { segment: Segment; salesSegment: SalesSegment } {
-  if (b2he === 'true') return { segment: 'B2C', salesSegment: 'B2HE' }
-  return { segment: 'WFD', salesSegment: 'B2G' }
+// WFD contacts are identified by a WIOA form submission (hs_analytics_source_data_2 contains "wioa").
+// All other contacts owned by the advisor list are B2C/B2HE.
+export function mapSegment(sourceData2: string | null | undefined): { segment: Segment; salesSegment: SalesSegment } {
+  if (sourceData2 && sourceData2.toLowerCase().includes('wioa')) {
+    return { segment: 'WFD', salesSegment: 'B2G' }
+  }
+  return { segment: 'B2C', salesSegment: 'B2HE' }
 }
 
 export function isEnrolled(leadStatus: string | null | undefined): boolean {

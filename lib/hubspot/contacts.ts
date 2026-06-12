@@ -2,6 +2,18 @@ import { hubspotFetch } from './client'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Advisors who handle B2C and WFD leads.
+export const ADVISOR_OWNER_IDS = [
+  '77266426', // Kevin Shafer
+  '80594832',
+  '82598427', // Quinn Ali
+  '751671020', // Hawama Sattar
+  '82724983',
+  '86817401',
+  '86293470',
+  '88207148', // Shawn Miller
+]
+
 export const CONTACT_PROPERTIES = [
   'firstname',
   'lastname',
@@ -11,10 +23,23 @@ export const CONTACT_PROPERTIES = [
   'program',
   'pick_university',
   'university',
-  'b2he',
+  'b2b',
   'hs_analytics_source',
+  'hs_analytics_source_data_2',
   'lastmodifieddate',
 ]
+
+const OWNER_FILTER = {
+  propertyName: 'hubspot_owner_id',
+  operator: 'IN',
+  values: ADVISOR_OWNER_IDS,
+}
+
+const B2B_EXCLUDE_FILTER = {
+  propertyName: 'b2b',
+  operator: 'NEQ',
+  value: 'true',
+}
 
 interface HubSpotContact {
   id: string
@@ -38,7 +63,11 @@ async function fetchContactsSince(afterDate: Date): Promise<HubSpotContact[]> {
       properties: CONTACT_PROPERTIES,
       sorts: [{ propertyName: 'createdate', direction: 'DESCENDING' }],
       filterGroups: [{
-        filters: [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: String(afterDate.getTime()) }],
+        filters: [
+          { propertyName: 'lastmodifieddate', operator: 'GTE', value: String(afterDate.getTime()) },
+          OWNER_FILTER,
+          B2B_EXCLUDE_FILTER,
+        ],
       }],
     }
     if (after) body.after = after
@@ -69,6 +98,8 @@ async function fetchContactsInRange(from: Date, to: Date): Promise<HubSpotContac
         filters: [
           { propertyName: 'createdate', operator: 'GTE', value: String(from.getTime()) },
           { propertyName: 'createdate', operator: 'LTE', value: String(to.getTime()) },
+          OWNER_FILTER,
+          B2B_EXCLUDE_FILTER,
         ],
       }],
     }
