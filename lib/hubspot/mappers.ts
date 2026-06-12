@@ -42,7 +42,6 @@ const ENROLLED_LEAD_STATUSES = new Set([
   'Student',
   'Signed Promissory Note / Closed Won',
   'Signed Promissory Note / Closed Won (B2C Interview)',
-  'Invoice Sent (B2C Interview)',
 ])
 
 export function isEnrolled(leadStatus: string | null | undefined): boolean {

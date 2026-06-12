@@ -3,7 +3,6 @@ import { hubspotFetch } from './client'
 const ENROLLED_STAGES = new Set([
   'Signed Promissory Note / Closed Won',
   'Signed Promissory Note / Closed Won (B2C Interview)',
-  'Invoice Sent (B2C Interview)',
 ])
 
 interface Deal {
