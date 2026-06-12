@@ -21,7 +21,7 @@ export async function recomputeCacMetrics(months: string[]): Promise<void> {
       const key: Key = [c.course ?? '', c.university ?? '', c.segment ?? '', c.original_source ?? ''].join('|')
       const existing = agg.get(key) ?? { leads: 0, enrollments: 0 }
       agg.set(key, {
-        leads: existing.leads + (c.viable ? 1 : 0),
+        leads: existing.leads + 1,
         enrollments: existing.enrollments + (c.enrolled ? 1 : 0),
       })
     }
