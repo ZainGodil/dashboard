@@ -65,10 +65,11 @@ export function mapSource(raw: string | null | undefined): string {
   return map[raw] ?? raw
 }
 
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
 export function formatMonth(date: string | null | undefined): string {
   if (!date) return ''
-  const d = new Date(date)
-  const mon = d.toLocaleString('en-US', { month: 'short', timeZone: 'America/Chicago' })
-  const yr = d.toLocaleString('en-US', { year: '2-digit', timeZone: 'America/Chicago' })
-  return `${mon}-${yr}`
+  // date is already a Chicago-timezone YYYY-MM-DD string — parse directly, no UTC assumption
+  const [yr4, mon] = date.split('-').map(Number)
+  return `${MONTH_SHORT[mon - 1]}-${String(yr4).slice(2)}`
 }
