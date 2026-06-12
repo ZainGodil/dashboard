@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
       const viable = isViable(p.hs_lead_status)
       const university = mapUniversity(p.pick_university ?? p.university)
-      const course = mapCourse(p.program)
+      const course = mapCourse(p.course_validation)
       const createDate = p.createdate ? new Date(p.createdate).toISOString().split('T')[0] : null
 
       return {

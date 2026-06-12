@@ -20,7 +20,7 @@ export const CONTACT_PROPERTIES = [
   'createdate',
   'hs_lead_status',
   'hubspot_owner_id',
-  'program',
+  'course_validation',
   'pick_university',
   'university',
   'b2b',

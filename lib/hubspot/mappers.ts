@@ -18,13 +18,15 @@ export function mapUniversity(raw: string | null | undefined): University | null
   return UNIVERSITY_MAP[raw.toLowerCase().trim()] ?? null
 }
 
-export function mapCourse(program: string | null | undefined): Course {
-  if (!program) return 'General'
-  const p = program.toLowerCase()
-  if (p.includes('ui/ux') || p === 'ui/ux') return 'UI/UX Design'
-  if (p.includes('digital marketing')) return 'Digital Marketing'
-  if (p.includes('generative ai') || p.includes('data analyst')) return 'Generative AI Data Analyst'
-  return 'General'
+export function mapCourse(courseValidation: string | null | undefined): Course {
+  if (!courseValidation) return 'General'
+  const COURSE_MAP: Record<string, Course> = {
+    'Generative AI Data Analyst': 'Generative AI Data Analyst',
+    'Digital Marketing': 'Digital Marketing',
+    'UX/UI': 'UI/UX Design',
+    'AI for Software Engineers': 'General',
+  }
+  return COURSE_MAP[courseValidation] ?? 'General'
 }
 
 // WFD contacts are identified by a WIOA form submission (hs_analytics_source_data_2 contains "wioa").
