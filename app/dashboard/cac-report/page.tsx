@@ -9,6 +9,9 @@ import L2ETrendChart from '@/components/charts/L2ETrendChart'
 import YoYSpendChart from '@/components/charts/YoYSpendChart'
 import WeeklySpendChart from '@/components/charts/WeeklySpendChart'
 import DailySpendChart from '@/components/charts/DailySpendChart'
+import GaugeCard from '@/components/charts/GaugeCard'
+import SalesCycleChart from '@/components/charts/SalesCycleChart'
+import MonthlyCacBarChart from '@/components/charts/MonthlyCacBarChart'
 import FilterBar from './FilterBar'
 import SbuTable from './SbuTable'
 
@@ -97,6 +100,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: yoySpendRaw },
     { data: weeklySpendRaw },
     { data: dailySpendRaw },
+    { data: enrollmentDatesRaw },
+    { data: monthlyCacRaw },
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, spend')
       .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date'),
@@ -108,7 +113,50 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .gte('date', eightWeeksAgo.toISOString().split('T')[0]).lte('date', todayStr),
     supabase.from('ad_spend').select('date, platform, spend')
       .gte('date', monthStart).lte('date', todayStr),
+    supabase.from('enrollments').select('hubspot_contact_id, enrolled_at, month')
+      .in('month', last12).not('enrolled_at', 'is', null),
+    supabase.from('cac_metrics').select('month, segment, enrollments, spend')
+      .in('month', last12),
   ])
+
+  // ── Sales cycle: avg days lead→enrollment per month ─────────────────
+  const enrolledIds = (enrollmentDatesRaw ?? []).map((e) => e.hubspot_contact_id).filter(Boolean)
+  let salesCycleData: { month: string; days: number }[] = last12.map((m) => ({ month: m, days: 0 }))
+
+  if (enrolledIds.length > 0) {
+    const { data: contactDates } = await supabase
+      .from('contacts')
+      .select('hubspot_id, create_date')
+      .in('hubspot_id', enrolledIds)
+
+    const contactMap = new Map((contactDates ?? []).map((c) => [c.hubspot_id, c.create_date]))
+
+    salesCycleData = last12.map((month) => {
+      const monthEnrollments = (enrollmentDatesRaw ?? []).filter((e) => e.month === month)
+      const validDays = monthEnrollments
+        .map((e) => {
+          const createDate = contactMap.get(e.hubspot_contact_id)
+          if (!createDate || !e.enrolled_at) return null
+          const diff = (new Date(e.enrolled_at).getTime() - new Date(createDate).getTime()) / 86_400_000
+          return diff
+        })
+        .filter((d): d is number => d !== null && d > 0 && d < 365)
+      const avg = validDays.length > 0 ? validDays.reduce((a, b) => a + b, 0) / validDays.length : 0
+      return { month, days: Math.round(avg) }
+    })
+  }
+
+  // ── Monthly CAC by segment ───────────────────────────────────────────
+  const monthlyCacData = last12.map((month) => {
+    const rows = (monthlyCacRaw ?? []).filter((r) => r.month === month)
+    const segCac = (seg: string) => {
+      const sr = rows.filter((r) => r.segment === seg)
+      const spend = sr.reduce((s, r) => s + Number(r.spend), 0)
+      const enroll = sr.reduce((s, r) => s + r.enrollments, 0)
+      return enroll > 0 ? Math.round(spend / enroll) : 0
+    }
+    return { month, B2C: segCac('B2C'), WFD: segCac('WFD') }
+  })
 
   // ── Aggregate chart data ─────────────────────────────────────────
 
@@ -175,6 +223,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       weeklyData={weeklyData}
       dailyData={dailyData}
       currentMonthLabel={currentMonthLabel}
+      salesCycleData={salesCycleData}
+      monthlyCacData={monthlyCacData}
     />
   )
 }
@@ -210,6 +260,8 @@ interface ContentProps {
   weeklyData: WeekPoint[]
   dailyData: DayPoint[]
   currentMonthLabel: string
+  salesCycleData: { month: string; days: number }[]
+  monthlyCacData: { month: string; B2C: number; WFD: number }[]
 }
 
 // ── Content component ────────────────────────────────────────────────────────
@@ -217,6 +269,7 @@ interface ContentProps {
 function CacReportContent({
   period, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
+  salesCycleData, monthlyCacData,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -325,6 +378,54 @@ function CacReportContent({
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
           <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : '—'} accent="teal" />
           <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
+        </div>
+
+        {/* Gauge row */}
+        <div className="grid grid-cols-4 gap-3">
+          <GaugeCard
+            label="Spend"
+            value={totalSpend}
+            displayValue={totalSpend >= 1000 ? `$${Math.round(totalSpend / 1000)}K` : `$${Math.round(totalSpend)}`}
+            max={500000}
+            color="#10B981"
+            formatMin="$0K"
+            formatMax="$500K"
+          />
+          <GaugeCard
+            label="Leads"
+            value={totalLeads}
+            displayValue={totalLeads.toLocaleString()}
+            max={6000}
+            color="#3B82F6"
+            formatMax="6000"
+          />
+          <GaugeCard
+            label="Total Enrollment"
+            value={totalEnrollments}
+            displayValue={totalEnrollments.toLocaleString()}
+            max={250}
+            color="#F59E0B"
+            formatMax="250"
+          />
+          <GaugeCard
+            label="Lead to Enrollment"
+            value={totalLeads > 0 ? (totalEnrollments / totalLeads) * 100 : 0}
+            displayValue={totalLeads > 0 ? `${((totalEnrollments / totalLeads) * 100).toFixed(2)}%` : '0%'}
+            max={12}
+            color="#1E3A5F"
+            formatMin="0.00%"
+            formatMax="12.00%"
+          />
+        </div>
+
+        {/* Sales Cycle + Monthly CAC charts */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <SalesCycleChart data={salesCycleData} />
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+            <MonthlyCacBarChart data={monthlyCacData} />
+          </div>
         </div>
 
         {/* SBU overview cards */}

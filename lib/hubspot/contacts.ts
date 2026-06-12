@@ -16,6 +16,7 @@ export const CONTACT_PROPERTIES = [
   'university',
   'hs_analytics_source',
   'hs_analytics_source_data_2',
+  'viable_non_viable_leads',
   'lastmodifieddate',
 ]
 

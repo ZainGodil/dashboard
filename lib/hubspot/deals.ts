@@ -4,7 +4,7 @@ const ENROLLED_STAGE = 'Signed Promissory Note / Closed Won'
 
 interface Deal {
   id: string
-  properties: { dealstage: string | null }
+  properties: { dealstage: string | null; closedate: string | null }
   associations?: { contacts?: { results: { id: string }[] } }
 }
 
@@ -13,14 +13,15 @@ interface DealsResponse {
   paging?: { next?: { after: string } }
 }
 
-export async function fetchEnrolledContactIds(): Promise<Set<string>> {
-  const contactIds = new Set<string>()
+// Returns Map<contactId, closedate (ISO string or null)>
+export async function fetchEnrolledContactIds(): Promise<Map<string, string | null>> {
+  const contactDates = new Map<string, string | null>()
   let after: string | undefined
 
   do {
     const params = new URLSearchParams({
       limit: '100',
-      properties: 'dealstage',
+      properties: 'dealstage,closedate',
       associations: 'contacts',
       ...(after ? { after } : {}),
     })
@@ -29,13 +30,16 @@ export async function fetchEnrolledContactIds(): Promise<Set<string>> {
 
     for (const deal of data.results) {
       if (deal.properties.dealstage === ENROLLED_STAGE) {
+        const closedate = deal.properties.closedate ?? null
         const contacts = deal.associations?.contacts?.results ?? []
-        for (const c of contacts) contactIds.add(c.id)
+        for (const c of contacts) {
+          if (!contactDates.has(c.id)) contactDates.set(c.id, closedate)
+        }
       }
     }
 
     after = data.paging?.next?.after
   } while (after)
 
-  return contactIds
+  return contactDates
 }

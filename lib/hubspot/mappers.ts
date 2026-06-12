@@ -55,14 +55,23 @@ export function mapSource(raw: string | null | undefined): string {
     PAID_SEARCH: 'Paid Search',
     PAID_SOCIAL: 'Paid Social',
     ORGANIC_SEARCH: 'Organic Search',
-    DIRECT_TRAFFIC: 'Direct',
+    ORGANIC_SOCIAL: 'Organic Social',
+    DIRECT_TRAFFIC: 'Direct Traffic',
     REFERRALS: 'Referrals',
-    EMAIL_MARKETING: 'Email',
-    SOCIAL_MEDIA: 'Social',
-    OTHER_CAMPAIGNS: 'Other',
-    OFFLINE: 'Offline',
+    EMAIL_MARKETING: 'Email Marketing',
+    SOCIAL_MEDIA: 'Organic Social',
+    OTHER_CAMPAIGNS: 'Other Campaigns',
+    OFFLINE: 'Offline Sources',
+    OFFLINE_SOURCES: 'Offline Sources',
+    AFFILIATE: 'Affiliate Learner',
+    OTHER: 'Other Campaigns',
   }
   return map[raw] ?? raw
+}
+
+export function mapViable(viableFlag: string | null | undefined): boolean {
+  if (!viableFlag) return true
+  return viableFlag.toLowerCase() === 'viable'
 }
 
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']

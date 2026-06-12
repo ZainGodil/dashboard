@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
 import { fetchOwnerMap } from '@/lib/hubspot/owners'
-import { mapUniversity, mapCourse, mapSegment, isEnrolled, isViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
+import { mapUniversity, mapCourse, mapSegment, isEnrolled, mapViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
 import { recomputeCacMetrics, recomputeRollingMetrics } from '@/lib/metrics/compute-cac'
 
 export const maxDuration = 300
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
       const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
-      const viable = isViable(p.hs_lead_status)
+      const viable = mapViable(p.viable_non_viable_leads)
       const university = mapUniversity(p.pick_university ?? p.university)
       const course = mapCourse(p.course_validation)
       // Use Chicago time (portal timezone) so dates match HubSpot's MTD filter
@@ -98,15 +98,21 @@ export async function GET(req: NextRequest) {
 
     const enrolledRows = rows
       .filter((r) => r.enrolled)
-      .map((r) => ({
-        hubspot_contact_id: r.hubspot_id,
-        course: r.course,
-        university: r.university,
-        segment: r.segment,
-        source: r.original_source,
-        enrolled_at: r.create_date,
-        month: r.create_date ? formatMonth(r.create_date) : null,
-      }))
+      .map((r) => {
+        const rawCloseDate = enrolledDealContactIds.get(r.hubspot_id) ?? null
+        const enrolledAt = rawCloseDate
+          ? new Date(rawCloseDate).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+          : r.create_date
+        return {
+          hubspot_contact_id: r.hubspot_id,
+          course: r.course,
+          university: r.university,
+          segment: r.segment,
+          source: r.original_source,
+          enrolled_at: enrolledAt,
+          month: enrolledAt ? formatMonth(enrolledAt) : null,
+        }
+      })
 
     if (enrolledRows.length) {
       const hubspotIds = enrolledRows.map((r) => r.hubspot_contact_id)
