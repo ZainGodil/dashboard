@@ -138,6 +138,11 @@ export async function GET(req: NextRequest) {
     for (const r of rows) {
       if (r.create_date) monthSet.add(formatMonth(r.create_date))
     }
+    // Also include enrollment months so deal-close months get recomputed even
+    // when no new leads were created that month.
+    for (const r of enrolledRows) {
+      if (r.month) monthSet.add(r.month)
+    }
     await recomputeCacMetrics(Array.from(monthSet))
 
     await recomputeRollingMetrics()

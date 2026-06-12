@@ -5,25 +5,35 @@ export async function recomputeCacMetrics(months: string[]): Promise<void> {
   const supabase = createServiceClient()
 
   for (const month of months) {
-    // Aggregate contacts for this month
+    // Leads: contacts created in this month
     const { data: contacts } = await supabase
       .from('contacts')
-      .select('course, university, segment, original_source, viable, enrolled')
+      .select('course, university, segment, original_source')
       .eq('month', month)
 
-    if (!contacts?.length) continue
+    // Enrollments: contacts whose deal closed in this month (event-date based)
+    const { data: enrolled } = await supabase
+      .from('enrollments')
+      .select('course, university, segment, source')
+      .eq('month', month)
+
+    const hasData = (contacts?.length ?? 0) > 0 || (enrolled?.length ?? 0) > 0
+    if (!hasData) continue
 
     // Build aggregation map keyed by (course, university, segment, source)
     type Key = string
     const agg = new Map<Key, { leads: number; enrollments: number }>()
 
-    for (const c of contacts) {
+    for (const c of contacts ?? []) {
       const key: Key = [c.course ?? '', c.university ?? '', c.segment ?? '', c.original_source ?? ''].join('|')
       const existing = agg.get(key) ?? { leads: 0, enrollments: 0 }
-      agg.set(key, {
-        leads: existing.leads + 1,
-        enrollments: existing.enrollments + (c.enrolled ? 1 : 0),
-      })
+      agg.set(key, { ...existing, leads: existing.leads + 1 })
+    }
+
+    for (const e of enrolled ?? []) {
+      const key: Key = [e.course ?? '', e.university ?? '', e.segment ?? '', e.source ?? ''].join('|')
+      const existing = agg.get(key) ?? { leads: 0, enrollments: 0 }
+      agg.set(key, { ...existing, enrollments: existing.enrollments + 1 })
     }
 
     // Fetch ad spend for this month
