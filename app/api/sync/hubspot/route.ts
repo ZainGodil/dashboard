@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       const viable = isViable(p.hs_lead_status)
       const university = mapUniversity(p.pick_university ?? p.university)
       const course = mapCourse(p.course_validation)
-      const createDate = p.createdate ? new Date(p.createdate).toISOString().split('T')[0] : null
+      const createDate = p.createdate ? new Date(Number(p.createdate)).toISOString().split('T')[0] : null
 
       return {
         hubspot_id: c.id,
