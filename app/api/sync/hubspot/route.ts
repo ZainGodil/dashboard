@@ -51,7 +51,10 @@ export async function GET(req: NextRequest) {
       const viable = isViable(p.hs_lead_status)
       const university = mapUniversity(p.pick_university ?? p.university)
       const course = mapCourse(p.course_validation)
-      const createDate = p.createdate ? new Date(Number(p.createdate)).toISOString().split('T')[0] : null
+      // Use Chicago time (portal timezone) so dates match HubSpot's MTD filter
+      const createDate = p.createdate
+        ? new Date(Number(p.createdate)).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+        : null
 
       return {
         hubspot_id: c.id,

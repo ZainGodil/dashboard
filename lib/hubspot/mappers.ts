@@ -68,5 +68,7 @@ export function mapSource(raw: string | null | undefined): string {
 export function formatMonth(date: string | null | undefined): string {
   if (!date) return ''
   const d = new Date(date)
-  return `${d.toLocaleString('en-US', { month: 'short' })}-${String(d.getFullYear()).slice(2)}`
+  const mon = d.toLocaleString('en-US', { month: 'short', timeZone: 'America/Chicago' })
+  const yr = d.toLocaleString('en-US', { year: '2-digit', timeZone: 'America/Chicago' })
+  return `${mon}-${yr}`
 }
