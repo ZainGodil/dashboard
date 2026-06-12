@@ -2,26 +2,26 @@
 
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
+  Tooltip, Legend, ResponsiveContainer, LabelList,
 } from 'recharts'
 
-interface MonthlyCacPoint { month: string; B2C: number; WFD: number }
+interface Props { data: { month: string; B2C: number; WFD: number }[] }
 
-interface Props { data: MonthlyCacPoint[] }
-
-const fmt = (v: number) => v >= 1000 ? `$${(v / 1000).toFixed(1)}K` : v > 0 ? `$${v}` : '—'
+const fmt = (v: unknown) => {
+  const n = Number(v)
+  if (!n) return ''
+  return n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${n}`
+}
 
 export default function MonthlyCacBarChart({ data }: Props) {
-  const hasData = data.some(d => d.B2C > 0 || d.WFD > 0)
+  const hasData = data.some((d) => d.B2C > 0 || d.WFD > 0)
 
   if (!hasData) {
     return (
       <div>
-        <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">
-          Monthly CAC
-        </div>
-        <div className="text-[11px] text-slate-400 mb-3">B2C vs WFD, last 12 months</div>
-        <div className="h-[200px] flex items-center justify-center text-slate-300 text-sm">
+        <p className="font-display text-[13px] font-bold text-slate-900 mb-0.5">Monthly CAC</p>
+        <p className="text-[11px] text-slate-400 mb-3">B2C vs WFD, last 12 months</p>
+        <div className="h-[210px] flex items-center justify-center text-slate-300 text-sm">
           No data — run HubSpot sync first
         </div>
       </div>
@@ -30,28 +30,49 @@ export default function MonthlyCacBarChart({ data }: Props) {
 
   return (
     <div>
-      <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">
-        Monthly CAC
-      </div>
-      <div className="text-[11px] text-slate-400 mb-3">B2C vs WFD, last 12 months</div>
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="30%">
-          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+      <p className="font-display text-[13px] font-bold text-slate-900 mb-0.5">Monthly CAC</p>
+      <p className="text-[11px] text-slate-400 mb-3">B2C vs WFD, last 12 months</p>
+      <ResponsiveContainer width="100%" height={210}>
+        <BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 4 }} barCategoryGap="28%">
+          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 9, fill: '#94A3B8' }}
+            axisLine={false}
+            tickLine={false}
+          />
           <YAxis
-            tick={{ fontSize: 11, fill: '#94A3B8' }}
+            tick={{ fontSize: 10, fill: '#94A3B8' }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
-            width={36}
+            width={34}
           />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
-            formatter={(v) => [fmt(Number(v)), '']}
+            formatter={(v: unknown) => [fmt(v), '']}
           />
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-          <Bar dataKey="B2C" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={20} />
-          <Bar dataKey="WFD" fill="#1E3A5F" radius={[3, 3, 0, 0]} maxBarSize={20} />
+          <Legend
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
+          />
+          <Bar dataKey="B2C" fill="#10B981" radius={[3, 3, 0, 0]} maxBarSize={18}>
+            <LabelList
+              dataKey="B2C"
+              position="top"
+              style={{ fontSize: 8.5, fill: '#374151', fontWeight: 600 }}
+              formatter={fmt}
+            />
+          </Bar>
+          <Bar dataKey="WFD" fill="#1E3A5F" radius={[3, 3, 0, 0]} maxBarSize={18}>
+            <LabelList
+              dataKey="WFD"
+              position="top"
+              style={{ fontSize: 8.5, fill: '#374151', fontWeight: 600 }}
+              formatter={fmt}
+            />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

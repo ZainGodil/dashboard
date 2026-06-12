@@ -16,8 +16,7 @@ export default function GaugeCard({
 }: GaugeCardProps) {
   const pct = Math.min(Math.max(value / max, 0), 0.9999)
 
-  // Semi-circular gauge: arc from left (cx−r, cy) counterclockwise through top to current point
-  const cx = 50, cy = 56, r = 42
+  const cx = 54, cy = 52, r = 40
   const angle = Math.PI * pct
   const endX = cx - r * Math.cos(angle)
   const endY = cy - r * Math.sin(angle)
@@ -30,21 +29,21 @@ export default function GaugeCard({
   const maxLabel = formatMax ?? String(max)
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-4 pt-3 pb-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col items-center">
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.6px] mb-1">{label}</p>
-      <svg viewBox="0 0 100 70" className="w-full max-w-[200px]">
+    <div className="bg-white border border-slate-200 rounded-xl px-3 pt-3 pb-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col items-center">
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.7px] mb-0.5">{label}</p>
+      <svg viewBox="0 0 108 70" className="w-full max-w-[220px]">
         {/* Background track */}
-        <path d={trackPath} fill="none" stroke="#E2E8F0" strokeWidth="9" strokeLinecap="round" />
+        <path d={trackPath} fill="none" stroke="#E2E8F0" strokeWidth="12" strokeLinecap="round" />
         {/* Value fill */}
         {fillPath && (
-          <path d={fillPath} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" />
+          <path d={fillPath} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" />
         )}
         {/* Min label */}
-        <text x={cx - r} y={cy + 13} textAnchor="middle" fontSize="6.5" fill="#94A3B8">{formatMin}</text>
+        <text x={cx - r} y={cy + 14} textAnchor="middle" fontSize="6.5" fill="#94A3B8">{formatMin}</text>
         {/* Max label */}
-        <text x={cx + r} y={cy + 13} textAnchor="middle" fontSize="6.5" fill="#94A3B8">{maxLabel}</text>
+        <text x={cx + r} y={cy + 14} textAnchor="middle" fontSize="6.5" fill="#94A3B8">{maxLabel}</text>
         {/* Current value */}
-        <text x={cx} y={cy - 3} textAnchor="middle" fontSize="15" fontWeight="700" fill="#0F172A">{displayValue}</text>
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="18" fontWeight="700" fill="#0F172A">{displayValue}</text>
       </svg>
     </div>
   )
