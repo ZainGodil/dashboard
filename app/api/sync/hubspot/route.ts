@@ -25,33 +25,19 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
   const startedAt = new Date().toISOString()
-  const isFullRefresh = req.nextUrl.searchParams.get('full') === '1'
 
   let recordsSynced = 0
   let errorMessage: string | null = null
   let step = 'init'
 
   try {
-    let afterDate: Date | undefined
-    if (!isFullRefresh) {
-      const { data: lastLog } = await supabase
-        .from('sync_log')
-        .select('completed_at')
-        .eq('source', 'hubspot')
-        .eq('status', 'success')
-        .order('completed_at', { ascending: false })
-        .limit(1)
-        .single()
-      if (lastLog?.completed_at) afterDate = new Date(lastLog.completed_at)
-    }
-
     step = 'owners'
     const ownerMap = await fetchOwnerMap()
     step = 'deals'
     const enrolledDealContactIds = await fetchEnrolledContactIds()
     step = 'contacts'
-    // fetchAllContacts already filters by advisor owner list and excludes b2b=true at the API level
-    const contacts = await fetchAllContacts(afterDate)
+    // Fetch all members of HubSpot list 5711 (maintained in HubSpot UI)
+    const contacts = await fetchAllContacts()
 
     if (!contacts.length) {
       await writeSyncLog(supabase, startedAt, 0, 'success', null)
@@ -134,7 +120,7 @@ export async function GET(req: NextRequest) {
     }
     await recomputeCacMetrics(Array.from(monthSet))
 
-    if (isFullRefresh) await recomputeRollingMetrics()
+    await recomputeRollingMetrics()
 
     await writeSyncLog(supabase, startedAt, recordsSynced, 'success', null)
     return NextResponse.json({ synced: recordsSynced, months: Array.from(monthSet) })
