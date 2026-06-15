@@ -280,9 +280,27 @@ function CacReportContent({
   const totalEnrollments = isRolling
     ? rollingRows.reduce((s, r) => s + r.enrollments_90d, 0)
     : cacRows.reduce((s, r) => s + r.enrollments, 0)
-  const totalSpend = isRolling
-    ? rollingRows.reduce((s, r) => s + Number(r.spend_90d), 0)
-    : cacRows.reduce((s, r) => s + Number(r.spend), 0)
+
+  // Spend is stored once per (course, university, segment) in the source table, but cac_metrics
+  // has one row per source — deduplicate so each combo is counted only once.
+  const totalSpend = (() => {
+    const seen = new Set<string>()
+    if (isRolling) {
+      return rollingRows.reduce((s, r) => {
+        const key = `${r.course ?? ''}|${r.university ?? ''}|${r.segment ?? ''}`
+        if (seen.has(key)) return s
+        seen.add(key)
+        return s + Number(r.spend_90d)
+      }, 0)
+    }
+    return cacRows.reduce((s, r) => {
+      const key = `${r.course ?? ''}|${r.university ?? ''}|${r.segment ?? ''}`
+      if (seen.has(key)) return s
+      seen.add(key)
+      return s + Number(r.spend)
+    }, 0)
+  })()
+
   const blendedCpl = totalLeads > 0 ? totalSpend / totalLeads : 0
   const blendedCac = totalEnrollments > 0 ? totalSpend / totalEnrollments : 0
 

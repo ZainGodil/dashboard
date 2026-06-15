@@ -10,7 +10,7 @@ interface SyncInfo {
   ads?: string
 }
 
-const NAV = [
+const NAV_REPORTS = [
   {
     href: '/dashboard/cac-report',
     label: 'CAC Report',
@@ -18,6 +18,16 @@ const NAV = [
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
         <rect x="1" y="3" width="14" height="10" rx="1.5"/>
         <path d="M5 3v10M10 3v10M1 7h14"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard/grand-summary',
+    label: 'Grand Summary',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="1" y="1" width="14" height="14" rx="1.5"/>
+        <path d="M1 5h14M1 9h14M5 5v10M10 5v10"/>
       </svg>
     ),
   },
@@ -50,6 +60,29 @@ const NAV = [
         <path d="M1 12c0-2.5 2-3.5 4.5-3.5S10 9.5 10 12"/>
         <circle cx="11.5" cy="9" r="2"/>
         <path d="M9.5 12.5c0-1 .9-1.5 2-1.5s2 .5 2 1.5"/>
+      </svg>
+    ),
+  },
+]
+
+const NAV_SPEND = [
+  {
+    href: '/dashboard/spend/google',
+    label: 'Google Spend',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M8 5v3h3"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard/spend/meta',
+    label: 'Meta Spend',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M2 8c0-3.3 2.7-6 6-6s6 2.7 6 6-2.7 6-6 6-6-2.7-6-6z"/>
+        <path d="M8 5v6M5 8h6"/>
       </svg>
     ),
   },
@@ -144,9 +177,9 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3">
+      <nav className="flex-1 px-2 py-3 overflow-y-auto">
         <div className="px-3 py-2 text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Reports</div>
-        {NAV.map(({ href, label, icon, badge }) => {
+        {NAV_REPORTS.map(({ href, label, icon, badge }) => {
           const active = pathname.startsWith(href)
           return (
             <Link
@@ -166,6 +199,26 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
                   {badge}
                 </span>
               )}
+            </Link>
+          )
+        })}
+
+        <div className="px-3 pt-4 pb-2 text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Spend</div>
+        {NAV_SPEND.map(({ href, label, icon }) => {
+          const active = pathname.startsWith(href)
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium mb-0.5 transition-all border ${
+                active
+                  ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700 border-transparent'
+              }`}
+            >
+              <span className={active ? 'opacity-100' : 'opacity-60'}>{icon}</span>
+              {label}
             </Link>
           )
         })}
