@@ -321,35 +321,47 @@ function CacReportContent({
   const googleCpl = googleLeads > 0 ? googleSpend / googleLeads : 0
   const metaCpl   = metaLeads > 0   ? metaSpend   / metaLeads   : 0
 
-  // SBU aggregation
-  type SbuEntry = { leads: number; enrollments: number; spend: number; uniMap: Map<string, { leads: number; enrollments: number; spend: number }> }
+  // Spend per course and per course|university from ad_spend (no double-counting)
+  const spendByCourse = new Map<string, number>()
+  const spendByCourseUni = new Map<string, number>()
+  for (const r of periodSpendRows) {
+    const c = r.course ?? 'General'
+    spendByCourse.set(c, (spendByCourse.get(c) ?? 0) + Number(r.spend))
+    const key = `${c}|${r.university ?? ''}`
+    spendByCourseUni.set(key, (spendByCourseUni.get(key) ?? 0) + Number(r.spend))
+  }
+
+  // SBU aggregation — leads/enrollments from cac_metrics, spend from ad_spend
+  type SbuEntry = { leads: number; enrollments: number; uniMap: Map<string, { leads: number; enrollments: number }> }
   const sbuMap = new Map<string, SbuEntry>()
-  for (const course of COURSES) sbuMap.set(course, { leads: 0, enrollments: 0, spend: 0, uniMap: new Map() })
+  for (const course of COURSES) sbuMap.set(course, { leads: 0, enrollments: 0, uniMap: new Map() })
 
   const sourceRows = isRolling
-    ? rollingRows.map((r) => ({ course: r.course, university: r.university, leads: r.leads_90d, enrollments: r.enrollments_90d, spend: Number(r.spend_90d) }))
-    : cacRows.map((r) => ({ course: r.course, university: r.university, leads: r.leads, enrollments: r.enrollments, spend: Number(r.spend) }))
+    ? rollingRows.map((r) => ({ course: r.course, university: r.university, leads: r.leads_90d, enrollments: r.enrollments_90d }))
+    : cacRows.map((r) => ({ course: r.course, university: r.university, leads: r.leads, enrollments: r.enrollments }))
 
   for (const r of sourceRows) {
     const course = r.course ?? 'General'
     const sbu = sbuMap.get(course) ?? sbuMap.get('General')!
-    sbu.leads += r.leads; sbu.enrollments += r.enrollments; sbu.spend += r.spend
+    sbu.leads += r.leads; sbu.enrollments += r.enrollments
     if (r.university) {
-      const u = sbu.uniMap.get(r.university) ?? { leads: 0, enrollments: 0, spend: 0 }
-      u.leads += r.leads; u.enrollments += r.enrollments; u.spend += r.spend
+      const u = sbu.uniMap.get(r.university) ?? { leads: 0, enrollments: 0 }
+      u.leads += r.leads; u.enrollments += r.enrollments
       sbu.uniMap.set(r.university, u)
     }
   }
 
   const sbuRows = COURSES.map((course) => {
     const sbu = sbuMap.get(course)!
+    const spend = spendByCourse.get(course) ?? 0
     const cvr = sbu.leads > 0 ? sbu.enrollments / sbu.leads : 0
-    const cpl = sbu.leads > 0 ? sbu.spend / sbu.leads : 0
-    const cac = sbu.enrollments > 0 ? sbu.spend / sbu.enrollments : 0
+    const cpl = sbu.leads > 0 ? spend / sbu.leads : 0
+    const cac = sbu.enrollments > 0 ? spend / sbu.enrollments : 0
 
     const byUniversity = Array.from(sbu.uniMap.entries()).map(([uni, u]) => {
       const spendGoogle = platMap.get(`${course}|${uni}|google`) ?? 0
       const spendMeta = platMap.get(`${course}|${uni}|meta`) ?? 0
+      const uniSpend = spendByCourseUni.get(`${course}|${uni}`) ?? (spendGoogle + spendMeta)
       return {
         university: uni,
         leads: u.leads,
@@ -359,11 +371,11 @@ function CacReportContent({
         spendMeta,
         cplGoogle: u.leads > 0 ? spendGoogle / u.leads : 0,
         cplMeta: u.leads > 0 ? spendMeta / u.leads : 0,
-        cac: u.enrollments > 0 ? u.spend / u.enrollments : 0,
+        cac: u.enrollments > 0 ? uniSpend / u.enrollments : 0,
       }
     })
 
-    return { course, leads: sbu.leads, enrollments: sbu.enrollments, cvr, spend: sbu.spend, cpl, cac, byUniversity }
+    return { course, leads: sbu.leads, enrollments: sbu.enrollments, cvr, spend, cpl, cac, byUniversity }
   })
 
   // CAC trend data (6 months per SBU)
