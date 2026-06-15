@@ -46,7 +46,7 @@ export default async function MetaSpendPage({ searchParams }: PageProps) {
   const totalSpend = rows.reduce((s, r) => s + Number(r.spend), 0)
   const totalImpressions = rows.reduce((s, r) => s + (r.impressions ?? 0), 0)
   const totalClicks = rows.reduce((s, r) => s + (r.clicks ?? 0), 0)
-  const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0
+  const avgCpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0
   const uniqueCampaigns = new Set(rows.map((r) => r.campaign_name)).size
 
   // Aggregate by university × course
@@ -97,7 +97,7 @@ export default async function MetaSpendPage({ searchParams }: PageProps) {
           <StatCard label={`Total Spend ${periodLabel}`} value={totalSpend > 0 ? `$${Math.round(totalSpend).toLocaleString()}` : '—'} accent="teal" />
           <StatCard label="Active Campaigns" value={uniqueCampaigns.toLocaleString()} accent="blue" />
           <StatCard label="Impressions" value={totalImpressions.toLocaleString()} accent="green" />
-          <StatCard label="Avg CPM" value={avgCpc > 0 ? `$${avgCpc.toFixed(2)}` : '—'} accent="amber" />
+          <StatCard label="Avg CPM" value={avgCpm > 0 ? `$${avgCpm.toFixed(2)}` : '—'} accent="amber" />
         </div>
 
         {/* Spend by Campus × Program */}

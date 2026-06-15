@@ -115,7 +115,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
   ] = await Promise.all([
-    supabase.from('ad_spend').select('date, platform, spend')
+    supabase.from('ad_spend').select('date, platform, course, spend')
       .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date'),
     supabase.from('contacts').select('month, original_source, viable, enrolled')
       .in('month', last12),
@@ -127,7 +127,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .gte('date', monthStart).lte('date', todayStr),
     supabase.from('enrollments').select('hubspot_contact_id, enrolled_at, month')
       .in('month', last12).not('enrolled_at', 'is', null),
-    supabase.from('cac_metrics').select('month, segment, enrollments, spend')
+    supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
       .in('month', last12),
   ])
 
@@ -159,11 +159,17 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   }
 
   // ── Monthly CAC by segment ───────────────────────────────────────────
+  // Dedup spend at (course, university) — cac_metrics copies the same spend to every source row
   const monthlyCacData = last12.map((month) => {
     const rows = (monthlyCacRaw ?? []).filter((r) => r.month === month)
     const segData = (seg: string) => {
       const sr = rows.filter((r) => r.segment === seg)
-      const spend = sr.reduce((s, r) => s + Number(r.spend), 0)
+      const seen = new Set<string>()
+      let spend = 0
+      for (const r of sr) {
+        const key = `${r.course ?? ''}|${r.university ?? ''}`
+        if (!seen.has(key)) { seen.add(key); spend += Number(r.spend) }
+      }
       const enroll = sr.reduce((s, r) => s + r.enrollments, 0)
       return { cac: enroll > 0 ? Math.round(spend / enroll) : 0, enroll }
     }
@@ -251,12 +257,12 @@ interface CacRow {
   leads: number; enrollments: number; cvr: number; spend: number; cpl: number; cac: number
 }
 interface RollingRow {
-  as_of_date: string; course: string | null; university: string | null; segment: string | null
+  as_of_date: string; course: string | null; university: string | null; segment: string | null; source: string | null
   leads_90d: number; enrollments_90d: number; spend_90d: number
   cvr_90d: number; cpl_90d: number; cac_90d: number
 }
 interface PeriodSpendRow { course: string | null; university: string | null; platform: string; spend: number }
-interface TrendSpendRow { date: string; platform: string; spend: number }
+interface TrendSpendRow { date: string; platform: string; course: string | null; spend: number }
 interface L2EPoint { month: string; 'Paid Search': number; 'Paid Social': number }
 interface YoYPoint { month: string; '2024': number; '2025': number; '2026': number }
 interface WeekPoint { week: string; google: number; meta: number }
@@ -313,10 +319,10 @@ function CacReportContent({
   const googleSpend = periodSpendRows.filter((r) => r.platform === 'google').reduce((s, r) => s + Number(r.spend), 0)
   const metaSpend   = periodSpendRows.filter((r) => r.platform === 'meta').reduce((s, r) => s + Number(r.spend), 0)
   const googleLeads = isRolling
-    ? rollingRows.reduce((s, r) => s + r.leads_90d, 0) // rolling doesn't split by source — use blended as fallback
+    ? rollingRows.filter((r) => r.source === 'Paid Search').reduce((s, r) => s + r.leads_90d, 0)
     : cacRows.filter((r) => r.source === 'Paid Search').reduce((s, r) => s + r.leads, 0)
   const metaLeads = isRolling
-    ? 0
+    ? rollingRows.filter((r) => r.source === 'Paid Social').reduce((s, r) => s + r.leads_90d, 0)
     : cacRows.filter((r) => r.source === 'Paid Social').reduce((s, r) => s + r.leads, 0)
   const googleCpl = googleLeads > 0 ? googleSpend / googleLeads : 0
   const metaCpl   = metaLeads > 0   ? metaSpend   / metaLeads   : 0
@@ -378,13 +384,16 @@ function CacReportContent({
     return { course, leads: sbu.leads, enrollments: sbu.enrollments, cvr, spend, cpl, cac, byUniversity }
   })
 
-  // CAC trend data (6 months per SBU)
+  // CAC trend data (6 months per SBU) — spend from ad_spend (no double-count)
   const trendData = trendMonths.map((month) => {
+    const [mon, yr] = month.split('-')
+    const prefix = `20${yr}-${MONTH_MAP[mon]}`
     const point: Record<string, number | string> = { month }
     for (const course of COURSES) {
-      const rows = cacRows.filter((r) => r.month === month && r.course === course)
-      const enroll = rows.reduce((s, r) => s + r.enrollments, 0)
-      const spend = rows.reduce((s, r) => s + Number(r.spend), 0)
+      const enroll = cacRows.filter((r) => r.month === month && r.course === course)
+        .reduce((s, r) => s + r.enrollments, 0)
+      const spend = trendSpendRows.filter((r) => r.date.startsWith(prefix) && r.course === course)
+        .reduce((s, r) => s + Number(r.spend), 0)
       point[course] = enroll > 0 ? Math.round(spend / enroll) : 0
     }
     return point
