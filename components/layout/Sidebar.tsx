@@ -67,12 +67,35 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [syncState, setSyncState] = useState<Record<'ads' | 'hubspot', 'idle' | 'loading' | 'success' | 'error'>>({
+    ads: 'idle',
+    hubspot: 'idle',
+  })
 
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  async function handleSync(source: 'ads' | 'hubspot') {
+    if (syncState[source] === 'loading') return
+    setSyncState((prev) => ({ ...prev, [source]: 'loading' }))
+    try {
+      const res = await fetch('/api/sync/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source }),
+      })
+      if (!res.ok) throw new Error('Sync failed')
+      setSyncState((prev) => ({ ...prev, [source]: 'success' }))
+      router.refresh()
+      setTimeout(() => setSyncState((prev) => ({ ...prev, [source]: 'idle' })), 2500)
+    } catch {
+      setSyncState((prev) => ({ ...prev, [source]: 'error' }))
+      setTimeout(() => setSyncState((prev) => ({ ...prev, [source]: 'idle' })), 3000)
+    }
   }
 
   const navContent = (
@@ -130,26 +153,53 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-slate-700 space-y-3">
-        {/* Sync status */}
-        {(syncInfo?.hubspot || syncInfo?.ads) && (
-          <div className="px-3 space-y-1">
-            <div className="text-[9px] uppercase tracking-widest text-slate-600 font-semibold">Last synced</div>
-            {syncInfo.hubspot && (
+        {/* Sync rows */}
+        {[
+          { key: 'hubspot' as const, label: 'HubSpot', dot: 'bg-emerald-500', ts: syncInfo?.hubspot },
+          { key: 'ads' as const,     label: 'Ads',     dot: 'bg-blue-500',    ts: syncInfo?.ads },
+        ].map(({ key, label, dot, ts }) => {
+          const state = syncState[key]
+          return (
+            <div key={key} className="px-3 space-y-1">
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                <span className="text-[10px] text-slate-500">HubSpot</span>
-                <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(syncInfo.hubspot)}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
+                <span className="text-[10px] text-slate-500">{label}</span>
+                {ts && state === 'idle' && (
+                  <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(ts)}</span>
+                )}
+                {state === 'success' && (
+                  <span className="text-[10px] text-emerald-400 ml-auto">synced ✓</span>
+                )}
+                {state === 'error' && (
+                  <span className="text-[10px] text-red-400 ml-auto">failed</span>
+                )}
+                <button
+                  onClick={() => handleSync(key)}
+                  disabled={state === 'loading'}
+                  title={key === 'hubspot' ? 'May take a few minutes' : undefined}
+                  className={[
+                    'ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                    state === 'loading'
+                      ? 'text-slate-500 cursor-not-allowed'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700',
+                  ].join(' ')}
+                >
+                  {state === 'loading' ? (
+                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2"/>
+                      <path d="M13.5 2.5v2.5H11"/>
+                    </svg>
+                  )}
+                  {state === 'loading' ? 'Syncing…' : 'Sync'}
+                </button>
               </div>
-            )}
-            {syncInfo.ads && (
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                <span className="text-[10px] text-slate-500">Ads</span>
-                <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(syncInfo.ads)}</span>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )
+        })}
 
         <button
           onClick={handleSignOut}
