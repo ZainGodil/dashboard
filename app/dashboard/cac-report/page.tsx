@@ -410,7 +410,7 @@ function CacReportContent({
         </div>
 
         {/* Platform split tiles */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           <StatCard
             label={`Google Spend ${periodLabel}`}
             value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
@@ -420,6 +420,11 @@ function CacReportContent({
             label={`Meta Spend ${periodLabel}`}
             value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : '—'}
             accent="teal"
+          />
+          <StatCard
+            label={`Total Spend ${periodLabel}`}
+            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
+            accent="amber"
           />
           <StatCard
             label="Google CPL"
