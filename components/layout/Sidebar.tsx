@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -71,6 +71,18 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
     ads: 'idle',
     hubspot: 'idle',
   })
+  const syncTimers = useRef<Record<'ads' | 'hubspot', ReturnType<typeof setTimeout> | null>>({
+    ads: null,
+    hubspot: null,
+  })
+
+  useEffect(() => {
+    const timers = syncTimers.current
+    return () => {
+      if (timers.ads) clearTimeout(timers.ads)
+      if (timers.hubspot) clearTimeout(timers.hubspot)
+    }
+  }, [])
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -91,10 +103,18 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
       if (!res.ok) throw new Error('Sync failed')
       setSyncState((prev) => ({ ...prev, [source]: 'success' }))
       router.refresh()
-      setTimeout(() => setSyncState((prev) => ({ ...prev, [source]: 'idle' })), 2500)
+      if (syncTimers.current[source]) clearTimeout(syncTimers.current[source]!)
+      syncTimers.current[source] = setTimeout(() => {
+        setSyncState((prev) => ({ ...prev, [source]: 'idle' }))
+        syncTimers.current[source] = null
+      }, 2500)
     } catch {
       setSyncState((prev) => ({ ...prev, [source]: 'error' }))
-      setTimeout(() => setSyncState((prev) => ({ ...prev, [source]: 'idle' })), 3000)
+      if (syncTimers.current[source]) clearTimeout(syncTimers.current[source]!)
+      syncTimers.current[source] = setTimeout(() => {
+        setSyncState((prev) => ({ ...prev, [source]: 'idle' }))
+        syncTimers.current[source] = null
+      }, 3000)
     }
   }
 
@@ -160,42 +180,49 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
         ].map(({ key, label, dot, ts }) => {
           const state = syncState[key]
           return (
-            <div key={key} className="px-3 space-y-1">
+            <div key={key} className="px-3">
               <div className="flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
                 <span className="text-[10px] text-slate-500">{label}</span>
-                {ts && state === 'idle' && (
-                  <span className="text-[10px] text-slate-400 ml-auto">{relativeTime(ts)}</span>
-                )}
-                {state === 'success' && (
-                  <span className="text-[10px] text-emerald-400 ml-auto">synced ✓</span>
-                )}
-                {state === 'error' && (
-                  <span className="text-[10px] text-red-400 ml-auto">failed</span>
-                )}
-                <button
-                  onClick={() => handleSync(key)}
-                  disabled={state === 'loading'}
-                  title={key === 'hubspot' ? 'May take a few minutes' : undefined}
-                  className={[
-                    'ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
-                    state === 'loading'
-                      ? 'text-slate-500 cursor-not-allowed'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700',
-                  ].join(' ')}
-                >
-                  {state === 'loading' ? (
-                    <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                    </svg>
-                  ) : (
-                    <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2"/>
-                      <path d="M13.5 2.5v2.5H11"/>
-                    </svg>
+                <span className="ml-auto flex items-center gap-1.5">
+                  {ts && state === 'idle' && (
+                    <span className="text-[10px] text-slate-400">{relativeTime(ts)}</span>
                   )}
-                  {state === 'loading' ? 'Syncing…' : 'Sync'}
-                </button>
+                  {state === 'success' && (
+                    <span className="text-[10px] text-emerald-400 flex items-center gap-0.5">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M2 6l3 3 5-5"/>
+                      </svg>
+                      synced
+                    </span>
+                  )}
+                  {state === 'error' && (
+                    <span className="text-[10px] text-red-400">failed</span>
+                  )}
+                  <button
+                    onClick={() => handleSync(key)}
+                    disabled={state === 'loading'}
+                    title={key === 'hubspot' ? 'May take a few minutes' : undefined}
+                    className={[
+                      'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                      state === 'loading'
+                        ? 'text-slate-500 cursor-not-allowed'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700',
+                    ].join(' ')}
+                  >
+                    {state === 'loading' ? (
+                      <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2"/>
+                        <path d="M13.5 2.5v2.5H11"/>
+                      </svg>
+                    )}
+                    {state === 'loading' ? 'Syncing…' : 'Sync'}
+                  </button>
+                </span>
               </div>
             </div>
           )
@@ -236,9 +263,7 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
       <aside
         className={[
           'flex flex-col bg-slate-800 shrink-0 h-full',
-          // Desktop: always visible, in flow
           'md:relative md:w-56 md:translate-x-0',
-          // Mobile: fixed overlay, slide in/out
           'fixed inset-y-0 left-0 z-50 w-64',
           'transition-transform duration-200 ease-in-out',
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
