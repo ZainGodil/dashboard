@@ -62,14 +62,25 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   let periodSpendRows: PeriodSpendRow[] = []
 
   if (period === '90d') {
-    const { data } = await supabase
-      .from('rolling_metrics').select('*')
-      .order('as_of_date', { ascending: false }).limit(500)
-    rollingRows = (data ?? []).filter((r) => {
+    const ninetyDaysAgo = new Date(today)
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+    const rollingStart = ninetyDaysAgo.toISOString().split('T')[0]
+
+    const [{ data: rollingData }, { data: rolling90dSpend }] = await Promise.all([
+      supabase.from('rolling_metrics').select('*').order('as_of_date', { ascending: false }).limit(500),
+      (() => {
+        let q = supabase.from('ad_spend').select('course, university, platform, spend')
+          .gte('date', rollingStart).lte('date', todayStr)
+        if (university) q = q.eq('university', university)
+        return q
+      })(),
+    ])
+    rollingRows = (rollingData ?? []).filter((r) => {
       if (university && r.university !== university) return false
       if (segment && r.segment !== segment) return false
       return true
     })
+    periodSpendRows = rolling90dSpend ?? []
   } else {
     const months = getMonthsForPeriod(period)
     let q = supabase.from('cac_metrics').select('*').in('month', months)
@@ -79,11 +90,13 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     cacRows = data ?? []
 
     if (months.length) {
-      const { data: ps } = await supabase
+      let psQ = supabase
         .from('ad_spend')
         .select('course, university, platform, spend')
         .gte('date', monthLabelToStart(months[0]))
         .lte('date', monthLabelToEnd(months[months.length - 1]))
+      if (university) psQ = psQ.eq('university', university)
+      const { data: ps } = await psQ
       periodSpendRows = ps ?? []
     }
   }
@@ -281,25 +294,10 @@ function CacReportContent({
     ? rollingRows.reduce((s, r) => s + r.enrollments_90d, 0)
     : cacRows.reduce((s, r) => s + r.enrollments, 0)
 
-  // Spend is stored once per (course, university, segment) in the source table, but cac_metrics
-  // has one row per source — deduplicate so each combo is counted only once.
-  const totalSpend = (() => {
-    const seen = new Set<string>()
-    if (isRolling) {
-      return rollingRows.reduce((s, r) => {
-        const key = `${r.course ?? ''}|${r.university ?? ''}|${r.segment ?? ''}`
-        if (seen.has(key)) return s
-        seen.add(key)
-        return s + Number(r.spend_90d)
-      }, 0)
-    }
-    return cacRows.reduce((s, r) => {
-      const key = `${r.course ?? ''}|${r.university ?? ''}|${r.segment ?? ''}`
-      if (seen.has(key)) return s
-      seen.add(key)
-      return s + Number(r.spend)
-    }, 0)
-  })()
+  // Use ad_spend directly as the source of truth for total spend — no double-counting possible
+  // since ad_spend is keyed by (date, platform, campaign_name). periodSpendRows covers both
+  // non-rolling and 90d periods (fetched with the same university filter as cacRows).
+  const totalSpend = periodSpendRows.reduce((s, r) => s + Number(r.spend), 0)
 
   const blendedCpl = totalLeads > 0 ? totalSpend / totalLeads : 0
   const blendedCac = totalEnrollments > 0 ? totalSpend / totalEnrollments : 0
