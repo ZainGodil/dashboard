@@ -146,10 +146,13 @@ function buildRows(
     aggMap.set(key, cur)
   }
 
+  // Union all keys so spend-only rows (campaigns with no tracked leads) are included
+  const allKeys = new Set([...spendMap.keys(), ...aggMap.keys()])
   const rows: SummaryRow[] = []
-  for (const [key, agg] of aggMap) {
+  for (const key of allKeys) {
     const [course, university] = key.split('|||')
     const spend = spendMap.get(key) ?? { google: 0, meta: 0 }
+    const agg = aggMap.get(key) ?? { leadsBySource: {}, totalLeads: 0, enrollments: 0 }
     rows.push({
       course: course || 'General',
       university: university || null,
