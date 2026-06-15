@@ -9,7 +9,6 @@ import L2ETrendChart from '@/components/charts/L2ETrendChart'
 import YoYSpendChart from '@/components/charts/YoYSpendChart'
 import WeeklySpendChart from '@/components/charts/WeeklySpendChart'
 import DailySpendChart from '@/components/charts/DailySpendChart'
-import GaugeCard from '@/components/charts/GaugeCard'
 import SalesCycleChart from '@/components/charts/SalesCycleChart'
 import MonthlyCacBarChart from '@/components/charts/MonthlyCacBarChart'
 import FilterBar from './FilterBar'
@@ -294,6 +293,18 @@ function CacReportContent({
     platMap.set(key, (platMap.get(key) ?? 0) + Number(r.spend))
   }
 
+  // Platform split tiles (Google vs Meta spend + CPL)
+  const googleSpend = periodSpendRows.filter((r) => r.platform === 'google').reduce((s, r) => s + Number(r.spend), 0)
+  const metaSpend   = periodSpendRows.filter((r) => r.platform === 'meta').reduce((s, r) => s + Number(r.spend), 0)
+  const googleLeads = isRolling
+    ? rollingRows.reduce((s, r) => s + r.leads_90d, 0) // rolling doesn't split by source — use blended as fallback
+    : cacRows.filter((r) => r.source === 'Paid Search').reduce((s, r) => s + r.leads, 0)
+  const metaLeads = isRolling
+    ? 0
+    : cacRows.filter((r) => r.source === 'Paid Social').reduce((s, r) => s + r.leads, 0)
+  const googleCpl = googleLeads > 0 ? googleSpend / googleLeads : 0
+  const metaCpl   = metaLeads > 0   ? metaSpend   / metaLeads   : 0
+
   // SBU aggregation
   type SbuEntry = { leads: number; enrollments: number; spend: number; uniMap: Map<string, { leads: number; enrollments: number; spend: number }> }
   const sbuMap = new Map<string, SbuEntry>()
@@ -382,41 +393,27 @@ function CacReportContent({
           <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
         </div>
 
-        {/* Gauge row */}
+        {/* Platform split tiles */}
         <div className="grid grid-cols-4 gap-3">
-          <GaugeCard
-            label="Spend"
-            value={totalSpend}
-            displayValue={totalSpend >= 1000 ? `$${Math.round(totalSpend / 1000)}K` : `$${Math.round(totalSpend)}`}
-            max={500000}
-            color="#10B981"
-            formatMin="$0K"
-            formatMax="$500K"
+          <StatCard
+            label={`Google Spend ${periodLabel}`}
+            value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
+            accent="blue"
           />
-          <GaugeCard
-            label="Leads"
-            value={totalLeads}
-            displayValue={totalLeads.toLocaleString()}
-            max={6000}
-            color="#3B82F6"
-            formatMax="6000"
+          <StatCard
+            label={`Meta Spend ${periodLabel}`}
+            value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : '—'}
+            accent="teal"
           />
-          <GaugeCard
-            label="Total Enrollment"
-            value={totalEnrollments}
-            displayValue={totalEnrollments.toLocaleString()}
-            max={250}
-            color="#F59E0B"
-            formatMax="250"
+          <StatCard
+            label="Google CPL"
+            value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : '—'}
+            accent="blue"
           />
-          <GaugeCard
-            label="Lead to Enrollment"
-            value={totalLeads > 0 ? (totalEnrollments / totalLeads) * 100 : 0}
-            displayValue={totalLeads > 0 ? `${((totalEnrollments / totalLeads) * 100).toFixed(2)}%` : '0%'}
-            max={12}
-            color="#1E3A5F"
-            formatMin="0.00%"
-            formatMax="12.00%"
+          <StatCard
+            label="Meta CPL"
+            value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : '—'}
+            accent="teal"
           />
         </div>
 
