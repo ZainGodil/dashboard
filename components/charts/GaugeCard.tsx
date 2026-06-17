@@ -21,8 +21,8 @@ export default function GaugeCard({
   const endX = cx - r * Math.cos(angle)
   const endY = cy - r * Math.sin(angle)
 
-  // Track: full upper semi-circle (left → top → right)
-  const trackPath = `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy}`
+  // Track: full upper semi-circle (left → top → right), sweep=1 = clockwise in SVG = upward
+  const trackPath = `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy}`
   // Fill: always largeArc=0 because the fill arc is always ≤ 180°
   const fillPath = pct > 0.001
     ? `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${endX} ${endY}`
