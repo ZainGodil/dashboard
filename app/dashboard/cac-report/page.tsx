@@ -117,7 +117,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: dailySpendRaw },
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
-    { data: mtdContactsRaw },
+    { data: mtdViableContactsRaw },
+    { data: mtdEnrollmentsRaw },
     bookingRevenueMtd,
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
@@ -134,8 +135,11 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .in('month', last12).not('enrolled_at', 'is', null),
     supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
       .in('month', last12),
-    supabase.from('contacts')
-      .select('first_name, last_name, course, university, advisor, segment, viable, enrolled')
+    // MTD viable leads count (for gauge)
+    supabase.from('contacts').select('id').eq('month', currentMtdMonth).eq('viable', true),
+    // MTD enrollments from enrollments table — consistent with cac_metrics source of truth
+    supabase.from('enrollments')
+      .select('hubspot_contact_id, course, university, segment')
       .eq('month', currentMtdMonth),
     fetchMtdBookingRevenue().catch(() => 0) as Promise<number>,
   ] as const)
@@ -239,10 +243,30 @@ export default async function CacReportPage({ searchParams }: PageProps) {
 
   const currentMonthLabel = today.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
-  const allMtdContacts = mtdContactsRaw ?? []
-  const mtdLeads = allMtdContacts.filter((c) => c.viable).length
-  const mtdEnrollments = allMtdContacts.filter((c) => c.enrolled).length
-  const mtdEnrolledNames = allMtdContacts.filter((c) => c.enrolled)
+  const mtdLeads = (mtdViableContactsRaw ?? []).length
+  const mtdEnrollmentsList = mtdEnrollmentsRaw ?? []
+  const mtdEnrollments = mtdEnrollmentsList.length
+
+  // Fetch names for MTD enrolled contacts via their hubspot IDs
+  const enrolledHsIds = mtdEnrollmentsList.map((e) => e.hubspot_contact_id).filter(Boolean) as string[]
+  const { data: enrolledContactsRaw } = enrolledHsIds.length > 0
+    ? await supabase.from('contacts')
+        .select('first_name, last_name, hubspot_id, course, university, advisor, segment')
+        .in('hubspot_id', enrolledHsIds)
+    : { data: [] }
+
+  const enrolledContactMap = new Map((enrolledContactsRaw ?? []).map((c) => [c.hubspot_id, c]))
+  const mtdEnrolledNames = mtdEnrollmentsList.map((e) => {
+    const contact = enrolledContactMap.get(e.hubspot_contact_id ?? '')
+    return {
+      first_name: contact?.first_name ?? null,
+      last_name: contact?.last_name ?? null,
+      course: contact?.course ?? e.course ?? null,
+      university: contact?.university ?? e.university ?? null,
+      advisor: contact?.advisor ?? null,
+      segment: contact?.segment ?? e.segment ?? null,
+    }
+  })
 
   return (
     <CacReportContent

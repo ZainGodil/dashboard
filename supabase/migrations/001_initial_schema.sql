@@ -3,9 +3,6 @@
 -- Workforce Institute Dashboard — initial schema
 -- ============================================================
 
--- Enable UUID generation
-create extension if not exists "pgcrypto";
-
 -- ============================================================
 -- contacts
 -- Raw HubSpot contact records, upserted on each sync
