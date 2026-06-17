@@ -17,7 +17,7 @@ import FilterBar from './FilterBar'
 import SbuTable from './SbuTable'
 
 interface PageProps {
-  searchParams: { period?: string; university?: string; segment?: string }
+  searchParams: { period?: string; university?: string; segment?: string; m?: string }
 }
 
 const COURSES = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'General']
@@ -51,20 +51,24 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const period = (searchParams.period ?? 'mtd') as Period
   const university = searchParams.university ?? ''
   const segment = searchParams.segment ?? ''
+  const customMonth = searchParams.m ?? null        // e.g. "Apr-26" from ‹ › navigator
   const supabase = createAdminClient()
 
   const today = new Date()
   const todayStr = today.toISOString().split('T')[0]
   const trendMonths = getLast6Months()
   const last12 = getLast12Months()
-  const currentMtdMonth = getMonthsForPeriod('mtd')[0]
+
+  // When a specific month is chosen via ‹ ›, override the period months
+  const is90d = period === '90d' && !customMonth
+  const activeMonths = customMonth ? [customMonth] : getMonthsForPeriod(period)
 
   // ── Period-specific data ──────────────────────────────────────────
   let cacRows: CacRow[] = []
   let rollingRows: RollingRow[] = []
   let periodSpendRows: PeriodSpendRow[] = []
 
-  if (period === '90d') {
+  if (is90d) {
     const ninetyDaysAgo = new Date(today)
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
     const rollingStart = ninetyDaysAgo.toISOString().split('T')[0]
@@ -85,7 +89,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     })
     periodSpendRows = rolling90dSpend ?? []
   } else {
-    const months = getMonthsForPeriod(period)
+    const months = activeMonths
     let q = supabase.from('cac_metrics').select('*').in('month', months)
     if (university) q = q.eq('university', university)
     if (segment) q = q.eq('segment', segment)
@@ -117,8 +121,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: dailySpendRaw },
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
-    { data: mtdViableContactsRaw },
-    { data: mtdEnrollmentsRaw },
+    { data: periodEnrollmentsRaw },
     bookingRevenueMtd,
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
@@ -135,12 +138,13 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .in('month', last12).not('enrolled_at', 'is', null),
     supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
       .in('month', last12),
-    // MTD viable leads count (for gauge)
-    supabase.from('contacts').select('id').eq('month', currentMtdMonth).eq('viable', true),
-    // MTD enrollments from enrollments table — consistent with cac_metrics source of truth
-    supabase.from('enrollments')
-      .select('hubspot_contact_id, course, university, segment')
-      .eq('month', currentMtdMonth),
+    // Enrollments for the active period — used for names table and gauge count
+    is90d
+      ? supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month')
+          .gte('enrolled_at', new Date(today.getTime() - 90 * 86400000).toISOString().split('T')[0])
+          .lte('enrolled_at', todayStr)
+      : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month')
+          .in('month', activeMonths),
     fetchMtdBookingRevenue().catch(() => 0) as Promise<number>,
   ] as const)
 
@@ -243,12 +247,9 @@ export default async function CacReportPage({ searchParams }: PageProps) {
 
   const currentMonthLabel = today.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
-  const mtdLeads = (mtdViableContactsRaw ?? []).length
-  const mtdEnrollmentsList = mtdEnrollmentsRaw ?? []
-  const mtdEnrollments = mtdEnrollmentsList.length
-
-  // Fetch names for MTD enrolled contacts via their hubspot IDs
-  const enrolledHsIds = mtdEnrollmentsList.map((e) => e.hubspot_contact_id).filter(Boolean) as string[]
+  // Fetch contact names for enrolled contacts in the active period
+  const periodEnrollmentsList = periodEnrollmentsRaw ?? []
+  const enrolledHsIds = periodEnrollmentsList.map((e) => e.hubspot_contact_id).filter(Boolean) as string[]
   const { data: enrolledContactsRaw } = enrolledHsIds.length > 0
     ? await supabase.from('contacts')
         .select('first_name, last_name, hubspot_id, course, university, advisor, segment')
@@ -256,7 +257,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     : { data: [] }
 
   const enrolledContactMap = new Map((enrolledContactsRaw ?? []).map((c) => [c.hubspot_id, c]))
-  const mtdEnrolledNames = mtdEnrollmentsList.map((e) => {
+  const enrolledNames = periodEnrollmentsList.map((e) => {
     const contact = enrolledContactMap.get(e.hubspot_contact_id ?? '')
     return {
       first_name: contact?.first_name ?? null,
@@ -284,9 +285,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       salesCycleData={salesCycleData}
       monthlyCacData={monthlyCacData}
       bookingRevenueMtd={bookingRevenueMtd as number}
-      mtdLeads={mtdLeads}
-      mtdEnrollments={mtdEnrollments}
-      mtdEnrolledNames={mtdEnrolledNames}
+      customMonth={customMonth}
+      enrolledNames={enrolledNames}
     />
   )
 }
@@ -321,6 +321,7 @@ interface MtdEnrolledContact {
 
 interface ContentProps {
   period: Period
+  customMonth: string | null
   cacRows: CacRow[]
   rollingRows: RollingRow[]
   periodSpendRows: PeriodSpendRow[]
@@ -334,17 +335,15 @@ interface ContentProps {
   salesCycleData: { month: string; days: number }[]
   monthlyCacData: { month: string; B2C: number; WFD: number; B2C_enroll: number; WFD_enroll: number }[]
   bookingRevenueMtd: number
-  mtdLeads: number
-  mtdEnrollments: number
-  mtdEnrolledNames: MtdEnrolledContact[]
+  enrolledNames: MtdEnrolledContact[]
 }
 
 // ── Content component ────────────────────────────────────────────────────────
 
 function CacReportContent({
-  period, cacRows, rollingRows, periodSpendRows,
+  period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
-  salesCycleData, monthlyCacData, bookingRevenueMtd, mtdLeads, mtdEnrollments, mtdEnrolledNames,
+  salesCycleData, monthlyCacData, bookingRevenueMtd, enrolledNames,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -463,11 +462,13 @@ function CacReportContent({
     return { month, google: filter('google'), meta: filter('meta') }
   })
 
-  const periodLabel = { mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }[period]
+  // Period label — shows month name when navigating via ‹ ›
+  const periodLabel = customMonth
+    ? (() => { const [mon, yr] = customMonth.split('-'); return `${mon} 20${yr}` })()
+    : ({ mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }[period] ?? 'MTD')
 
-  // MTD gauge values — always current month regardless of period toggle
-  const mtdSpend = dailyData.reduce((s, d) => s + d.google + d.meta, 0)
-  const mtdL2E = mtdLeads > 0 ? (mtdEnrollments / mtdLeads) * 100 : 0
+  // Gauge values derived from period data (totalLeads / totalEnrollments / totalSpend)
+  const gaugeL2E = totalLeads > 0 ? (totalEnrollments / totalLeads) * 100 : 0
 
   return (
     <div>
@@ -523,39 +524,39 @@ function CacReportContent({
           />
         </div>
 
-        {/* Row 3: Gauges — always MTD */}
+        {/* Row 3: Gauges — follow active period */}
         <div className="grid grid-cols-4 gap-4">
           <GaugeCard
-            label="Spend MTD"
-            value={mtdSpend}
-            displayValue={mtdSpend > 0 ? `$${Math.round(mtdSpend / 1000)}k` : '—'}
+            label={`Spend ${periodLabel}`}
+            value={totalSpend}
+            displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
             max={250000}
             color="#2563EB"
             formatMin="$0"
             formatMax="$250k"
           />
           <GaugeCard
-            label="Leads MTD"
-            value={mtdLeads}
-            displayValue={mtdLeads.toLocaleString()}
+            label={`Leads ${periodLabel}`}
+            value={totalLeads}
+            displayValue={totalLeads.toLocaleString()}
             max={6000}
             color="#059669"
             formatMin="0"
             formatMax="6,000"
           />
           <GaugeCard
-            label="Total Enrollment MTD"
-            value={mtdEnrollments}
-            displayValue={mtdEnrollments.toLocaleString()}
+            label={`Enrollment ${periodLabel}`}
+            value={totalEnrollments}
+            displayValue={totalEnrollments.toLocaleString()}
             max={250}
             color="#D97706"
             formatMin="0"
             formatMax="250"
           />
           <GaugeCard
-            label="Lead to Enrollment MTD"
-            value={mtdL2E}
-            displayValue={mtdL2E > 0 ? `${mtdL2E.toFixed(2)}%` : '—'}
+            label={`L2E% ${periodLabel}`}
+            value={gaugeL2E}
+            displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : '—'}
             max={12}
             color="#7C3AED"
             formatMin="0%"
@@ -628,14 +629,14 @@ function CacReportContent({
           </div>
         </div>
 
-        {/* MTD Enrollment Names */}
+        {/* Enrollment Names — follow active period */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
-            <span className="font-display text-[13px] font-bold text-slate-900">MTD Enrollments</span>
-            <span className="text-[11px] text-slate-400">{currentMonthLabel} · {mtdEnrolledNames.length} enrolled</span>
+            <span className="font-display text-[13px] font-bold text-slate-900">Enrollments</span>
+            <span className="text-[11px] text-slate-400">{periodLabel} · {enrolledNames.length} enrolled</span>
           </div>
-          {mtdEnrolledNames.length === 0 ? (
-            <p className="px-5 py-6 text-[13px] text-slate-400">No enrollments recorded for this month yet.</p>
+          {enrolledNames.length === 0 ? (
+            <p className="px-5 py-6 text-[13px] text-slate-400">No enrollments recorded for this period yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -650,7 +651,7 @@ function CacReportContent({
                   </tr>
                 </thead>
                 <tbody>
-                  {mtdEnrolledNames.map((c, i) => (
+                  {enrolledNames.map((c: MtdEnrolledContact, i: number) => (
                     <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="px-5 py-2.5 text-slate-400 tabular-nums">{i + 1}</td>
                       <td className="px-5 py-2.5 font-medium text-slate-900">
