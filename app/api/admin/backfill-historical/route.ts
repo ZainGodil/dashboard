@@ -127,8 +127,13 @@ export async function GET(req: NextRequest) {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
       const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
-      const createDate = p.createdate
-        ? new Date(Number(p.createdate)).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+      // v3 Search API returns ISO strings; v1 List API returns ms timestamps — handle both
+      const rawCreated = p.createdate
+      const createTs = rawCreated
+        ? (isNaN(Number(rawCreated)) ? Date.parse(rawCreated) : Number(rawCreated))
+        : null
+      const createDate = createTs && !isNaN(createTs)
+        ? new Date(createTs).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
         : null
 
       return {
