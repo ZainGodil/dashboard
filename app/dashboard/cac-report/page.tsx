@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getMonthsForPeriod, getLast6Months, getLast12Months, type Period } from '@/lib/metrics/periods'
+import { fetchMtdBookingRevenue } from '@/lib/hubspot/deals'
 import StatCard from '@/components/ui/StatCard'
+import GaugeCard from '@/components/charts/GaugeCard'
 import SbuCard from '@/components/ui/SbuCard'
 import CacTrendChart from '@/components/charts/CacTrendChart'
 import MonthlySpendChart from '@/components/charts/MonthlySpendChart'
@@ -55,6 +57,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const todayStr = today.toISOString().split('T')[0]
   const trendMonths = getLast6Months()
   const last12 = getLast12Months()
+  const currentMtdMonth = getMonthsForPeriod('mtd')[0]
 
   // ── Period-specific data ──────────────────────────────────────────
   let cacRows: CacRow[] = []
@@ -114,6 +117,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: dailySpendRaw },
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
+    { data: mtdContactsRaw },
+    bookingRevenueMtd,
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
       .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date'),
@@ -129,7 +134,11 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .in('month', last12).not('enrolled_at', 'is', null),
     supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
       .in('month', last12),
-  ])
+    supabase.from('contacts')
+      .select('first_name, last_name, course, university, advisor, segment, viable, enrolled')
+      .eq('month', currentMtdMonth),
+    fetchMtdBookingRevenue().catch(() => 0) as Promise<number>,
+  ] as const)
 
   // ── Sales cycle: avg days lead→enrollment per month ─────────────────
   const enrolledIds = (enrollmentDatesRaw ?? []).map((e) => e.hubspot_contact_id).filter(Boolean)
@@ -230,6 +239,11 @@ export default async function CacReportPage({ searchParams }: PageProps) {
 
   const currentMonthLabel = today.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
+  const allMtdContacts = mtdContactsRaw ?? []
+  const mtdLeads = allMtdContacts.filter((c) => c.viable).length
+  const mtdEnrollments = allMtdContacts.filter((c) => c.enrolled).length
+  const mtdEnrolledNames = allMtdContacts.filter((c) => c.enrolled)
+
   return (
     <CacReportContent
       period={period}
@@ -245,6 +259,10 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       currentMonthLabel={currentMonthLabel}
       salesCycleData={salesCycleData}
       monthlyCacData={monthlyCacData}
+      bookingRevenueMtd={bookingRevenueMtd as number}
+      mtdLeads={mtdLeads}
+      mtdEnrollments={mtdEnrollments}
+      mtdEnrolledNames={mtdEnrolledNames}
     />
   )
 }
@@ -268,6 +286,15 @@ interface YoYPoint { month: string; '2024': number; '2025': number; '2026': numb
 interface WeekPoint { week: string; google: number; meta: number }
 interface DayPoint { date: string; google: number; meta: number }
 
+interface MtdEnrolledContact {
+  first_name: string | null
+  last_name: string | null
+  course: string | null
+  university: string | null
+  advisor: string | null
+  segment: string | null
+}
+
 interface ContentProps {
   period: Period
   cacRows: CacRow[]
@@ -282,6 +309,10 @@ interface ContentProps {
   currentMonthLabel: string
   salesCycleData: { month: string; days: number }[]
   monthlyCacData: { month: string; B2C: number; WFD: number; B2C_enroll: number; WFD_enroll: number }[]
+  bookingRevenueMtd: number
+  mtdLeads: number
+  mtdEnrollments: number
+  mtdEnrolledNames: MtdEnrolledContact[]
 }
 
 // ── Content component ────────────────────────────────────────────────────────
@@ -289,7 +320,7 @@ interface ContentProps {
 function CacReportContent({
   period, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
-  salesCycleData, monthlyCacData,
+  salesCycleData, monthlyCacData, bookingRevenueMtd, mtdLeads, mtdEnrollments, mtdEnrolledNames,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -410,6 +441,10 @@ function CacReportContent({
 
   const periodLabel = { mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }[period]
 
+  // MTD gauge values — always current month regardless of period toggle
+  const mtdSpend = dailyData.reduce((s, d) => s + d.google + d.meta, 0)
+  const mtdL2E = mtdLeads > 0 ? (mtdEnrollments / mtdLeads) * 100 : 0
+
   return (
     <div>
       {/* Top bar */}
@@ -422,16 +457,26 @@ function CacReportContent({
       </header>
 
       <div className="p-6 space-y-4">
-        {/* Summary stat cards */}
-        <div className="grid grid-cols-4 gap-3">
+        {/* Row 1: Summary stat cards — 5 cols */}
+        <div className="grid grid-cols-5 gap-3">
           <StatCard label={`Total Leads ${periodLabel}`} value={totalLeads.toLocaleString()} accent="blue" />
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
+          <StatCard
+            label="Bookings MTD"
+            value={bookingRevenueMtd > 0 ? `$${Math.round(bookingRevenueMtd).toLocaleString()}` : '—'}
+            accent="green"
+          />
           <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : '—'} accent="teal" />
           <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
         </div>
 
-        {/* Platform split tiles */}
+        {/* Row 2: Platform spend tiles — Total Spend first */}
         <div className="grid grid-cols-5 gap-3">
+          <StatCard
+            label={`Total Spend ${periodLabel}`}
+            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
+            accent="amber"
+          />
           <StatCard
             label={`Google Spend ${periodLabel}`}
             value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
@@ -443,11 +488,6 @@ function CacReportContent({
             accent="teal"
           />
           <StatCard
-            label={`Total Spend ${periodLabel}`}
-            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
-            accent="amber"
-          />
-          <StatCard
             label="Google CPL"
             value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : '—'}
             accent="blue"
@@ -456,6 +496,46 @@ function CacReportContent({
             label="Meta CPL"
             value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : '—'}
             accent="teal"
+          />
+        </div>
+
+        {/* Row 3: Gauges — always MTD */}
+        <div className="grid grid-cols-4 gap-4">
+          <GaugeCard
+            label="Spend MTD"
+            value={mtdSpend}
+            displayValue={mtdSpend > 0 ? `$${Math.round(mtdSpend / 1000)}k` : '—'}
+            max={250000}
+            color="#2563EB"
+            formatMin="$0"
+            formatMax="$250k"
+          />
+          <GaugeCard
+            label="Leads MTD"
+            value={mtdLeads}
+            displayValue={mtdLeads.toLocaleString()}
+            max={6000}
+            color="#059669"
+            formatMin="0"
+            formatMax="6,000"
+          />
+          <GaugeCard
+            label="Total Enrollment MTD"
+            value={mtdEnrollments}
+            displayValue={mtdEnrollments.toLocaleString()}
+            max={250}
+            color="#D97706"
+            formatMin="0"
+            formatMax="250"
+          />
+          <GaugeCard
+            label="Lead to Enrollment MTD"
+            value={mtdL2E}
+            displayValue={mtdL2E > 0 ? `${mtdL2E.toFixed(2)}%` : '—'}
+            max={12}
+            color="#7C3AED"
+            formatMin="0%"
+            formatMax="12%"
           />
         </div>
 
@@ -485,7 +565,7 @@ function CacReportContent({
           ))}
         </div>
 
-        {/* Detail table */}
+        {/* SBU detail table */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
             <span className="font-display text-[13px] font-bold text-slate-900">SBU Breakdown</span>
@@ -494,34 +574,82 @@ function CacReportContent({
           <SbuTable rows={sbuRows} />
         </div>
 
-        {/* Charts row 1: CAC Trend + Monthly Spend */}
+        {/* Charts row 1: Daily Spend | Weekly Paid Media */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <CacTrendChart data={trendData} />
+            <DailySpendChart data={dailyData} monthLabel={currentMonthLabel} />
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <MonthlySpendChart data={monthlySpend} />
+            <WeeklySpendChart data={weeklyData} />
           </div>
         </div>
 
-        {/* Charts row 2: L2E% Trend + YoY Spend */}
+        {/* Charts row 2: Monthly Ad Spend | YoY Ad Spend */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <L2ETrendChart data={l2eData} />
+            <MonthlySpendChart data={monthlySpend} />
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
             <YoYSpendChart data={yoyData} />
           </div>
         </div>
 
-        {/* Charts row 3: Weekly Paid Media + Daily Spend */}
+        {/* Charts row 3: CAC Trend | L2E% Trend */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <WeeklySpendChart data={weeklyData} />
+            <CacTrendChart data={trendData} />
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <DailySpendChart data={dailyData} monthLabel={currentMonthLabel} />
+            <L2ETrendChart data={l2eData} />
           </div>
+        </div>
+
+        {/* MTD Enrollment Names */}
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
+            <span className="font-display text-[13px] font-bold text-slate-900">MTD Enrollments</span>
+            <span className="text-[11px] text-slate-400">{currentMonthLabel} · {mtdEnrolledNames.length} enrolled</span>
+          </div>
+          {mtdEnrolledNames.length === 0 ? (
+            <p className="px-5 py-6 text-[13px] text-slate-400">No enrollments recorded for this month yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">#</th>
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Name</th>
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Course</th>
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">University</th>
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Advisor</th>
+                    <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Segment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mtdEnrolledNames.map((c, i) => (
+                    <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-2.5 text-slate-400 tabular-nums">{i + 1}</td>
+                      <td className="px-5 py-2.5 font-medium text-slate-900">
+                        {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
+                      </td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.course ?? '—'}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.university ?? '—'}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.advisor ?? '—'}</td>
+                      <td className="px-5 py-2.5">
+                        {c.segment ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            c.segment === 'B2C' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                          }`}>
+                            {c.segment}
+                          </span>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
