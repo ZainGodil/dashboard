@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
 import { hubspotFetch } from '@/lib/hubspot/client'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
@@ -70,9 +71,21 @@ async function fetchContactsByDateRange(
   return all
 }
 
+function isAuthorized(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) return false
+  // Accept Authorization: Bearer header (preferred) or x-cron-secret header
+  const fromBearer = req.headers.get('authorization')?.replace('Bearer ', '') ?? ''
+  const fromHeader = req.headers.get('x-cron-secret') ?? ''
+  // Also accept ?s= for backward compatibility with other admin endpoints
+  const fromQuery = req.nextUrl.searchParams.get('s') ?? ''
+  const candidate = fromBearer || fromHeader || fromQuery
+  if (!candidate || candidate.length !== cronSecret.length) return false
+  return timingSafeEqual(Buffer.from(candidate), Buffer.from(cronSecret))
+}
+
 export async function GET(req: NextRequest) {
-  const secret = req.nextUrl.searchParams.get('s')
-  if (secret !== process.env.CRON_SECRET) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -207,10 +220,8 @@ export async function GET(req: NextRequest) {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    const cause = err instanceof Error && (err as NodeJS.ErrnoException).cause
-      ? String((err as NodeJS.ErrnoException).cause)
-      : undefined
-    console.error('[backfill-historical]', msg, cause ?? '')
-    return NextResponse.json({ error: msg, cause }, { status: 500 })
+    const cause = err instanceof Error ? String((err as NodeJS.ErrnoException).cause ?? '') : ''
+    console.error('[backfill-historical]', msg, cause)
+    return NextResponse.json({ error: 'Internal error — check server logs' }, { status: 500 })
   }
 }
