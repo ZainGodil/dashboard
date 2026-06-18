@@ -180,16 +180,18 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   }
 
   // ── Monthly blended CAC ─────────────────────────────────────────────
-  // Dedup spend at (course, university) — cac_metrics copies the same spend to every source row
+  // Spend from ad_spend directly (always current) — cac_metrics.spend is a snapshot that
+  // drifts whenever ad_spend is updated independently (e.g. re-syncs, paused-campaign fix).
+  // Enrollments from cac_metrics (event-date based, no duplication per contact).
   const monthlyCacData = last12.map((month) => {
-    const rows = (monthlyCacRaw ?? []).filter((r) => r.month === month)
-    const seen = new Set<string>()
-    let spend = 0
-    for (const r of rows) {
-      const key = `${r.course ?? ''}|${r.university ?? ''}`
-      if (!seen.has(key)) { seen.add(key); spend += Number(r.spend) }
-    }
-    const enrollments = rows.reduce((s, r) => s + r.enrollments, 0)
+    const [mon, yr] = month.split('-')
+    const prefix = `20${yr}-${MONTH_MAP[mon]}`
+    const spend = (yoySpendRaw ?? [])
+      .filter((r) => r.date.startsWith(prefix))
+      .reduce((s, r) => s + Number(r.spend), 0)
+    const enrollments = (monthlyCacRaw ?? [])
+      .filter((r) => r.month === month)
+      .reduce((s, r) => s + r.enrollments, 0)
     return { month, cac: enrollments > 0 ? Math.round(spend / enrollments) : 0, enrollments }
   })
 
