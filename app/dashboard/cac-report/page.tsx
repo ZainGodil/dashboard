@@ -264,6 +264,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       university: contact?.university ?? e.university ?? null,
       advisor: contact?.advisor ?? null,
       segment: contact?.segment ?? e.segment ?? null,
+      deal_amount: (e as { deal_amount?: number | null }).deal_amount ?? null,
     }
   })
 
@@ -317,6 +318,7 @@ interface MtdEnrolledContact {
   university: string | null
   advisor: string | null
   segment: string | null
+  deal_amount: number | null
 }
 
 interface ContentProps {
@@ -649,6 +651,7 @@ function CacReportContent({
                     <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">University</th>
                     <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Advisor</th>
                     <th className="px-5 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Segment</th>
+                    <th className="px-5 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-[0.5px]">Deal Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -669,6 +672,11 @@ function CacReportContent({
                             {c.segment}
                           </span>
                         ) : '—'}
+                      </td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-slate-700 font-medium">
+                        {c.deal_amount != null && c.deal_amount > 0
+                          ? `$${c.deal_amount.toLocaleString()}`
+                          : '—'}
                       </td>
                     </tr>
                   ))}
