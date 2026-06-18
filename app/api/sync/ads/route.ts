@@ -4,7 +4,7 @@ import { fetchCampaignPerformance } from '@/lib/google-ads/campaigns'
 import { fetchMetaCampaignPerformance } from '@/lib/meta/campaigns'
 import { isMetaConfigured } from '@/lib/meta/client'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 function isAuthorized(req: NextRequest): boolean {
   if (process.env.NODE_ENV !== 'production') return true
@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient()
   const startedAt = new Date().toISOString()
   const isFullRefresh = req.nextUrl.searchParams.get('full') === '1'
-  const sinceDays = isFullRefresh ? 90 : 30
+  const daysParam = req.nextUrl.searchParams.get('days')
+  const sinceDays = daysParam ? Math.min(Number(daysParam), 730) : isFullRefresh ? 90 : 30
 
   const results = { google: 0, meta: 0, errors: [] as string[] }
 
