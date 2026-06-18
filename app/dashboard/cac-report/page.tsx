@@ -124,7 +124,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: trendCacRaw },
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
-      .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date').limit(10000),
+      .gte('date', monthLabelToStart(last12[0])).lte('date', todayStr).order('date').limit(10000),
     supabase.from('contacts').select('month, original_source, viable, enrolled')
       .in('month', last12).in('original_source', ['Paid Search', 'Paid Social']).limit(10000),
     supabase.from('ad_spend').select('date, spend')
@@ -186,7 +186,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const monthlyCacData = last12.map((month) => {
     const [mon, yr] = month.split('-')
     const prefix = `20${yr}-${MONTH_MAP[mon]}`
-    const spend = (yoySpendRaw ?? [])
+    const spend = (trendSpendRaw ?? [])
       .filter((r) => r.date.startsWith(prefix))
       .reduce((s, r) => s + Number(r.spend), 0)
     const enrollments = (monthlyCacRaw ?? [])
