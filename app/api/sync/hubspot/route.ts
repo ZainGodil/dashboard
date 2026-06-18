@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
 import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
 import { fetchOwnerMap } from '@/lib/hubspot/owners'
-import { mapUniversity, mapCourse, mapSegment, isEnrolled, mapViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
+import { mapUniversity, mapCourse, mapSegment, mapViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
 import { recomputeCacMetrics, recomputeRollingMetrics } from '@/lib/metrics/compute-cac'
 
 export const maxDuration = 300
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     const rows = contacts.map((c) => {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
-      const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
+      const enrolled = enrolledDealContactIds.has(c.id)
       const viable = mapViable(p.viable_non_viable_leads)
       const university = mapUniversity(p.pick_university ?? p.university)
       const course = mapCourse(p.course_validation)
@@ -84,6 +84,14 @@ export async function GET(req: NextRequest) {
       if (error) throw new Error(`Upsert error: ${error.message}`)
     }
     recordsSynced = rows.length
+
+    // Remove enrollment rows for contacts that no longer have a deal in an enrolled stage
+    const unenrolledIds = rows.filter((r) => !r.enrolled).map((r) => r.hubspot_id)
+    if (unenrolledIds.length > 0) {
+      for (let i = 0; i < unenrolledIds.length; i += BATCH) {
+        await supabase.from('enrollments').delete().in('hubspot_contact_id', unenrolledIds.slice(i, i + BATCH))
+      }
+    }
 
     // Remove contacts that are no longer in the list (orphans from previous syncs)
     const syncedIds = new Set(rows.map((r) => r.hubspot_id))

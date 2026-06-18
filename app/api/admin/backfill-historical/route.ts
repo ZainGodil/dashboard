@@ -8,7 +8,6 @@ import {
   mapUniversity,
   mapCourse,
   mapSegment,
-  isEnrolled,
   mapViable,
   mapSource,
   formatMonth,
@@ -126,7 +125,7 @@ export async function GET(req: NextRequest) {
     const rows = contacts.map((c) => {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
-      const enrolled = isEnrolled(p.hs_lead_status) || enrolledDealContactIds.has(c.id)
+      const enrolled = enrolledDealContactIds.has(c.id)
       // v3 Search API returns ISO strings; v1 List API returns ms timestamps — handle both
       const rawCreated = p.createdate
       const createTs = rawCreated

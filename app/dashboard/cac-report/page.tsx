@@ -121,13 +121,14 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
     { data: periodEnrollmentsRaw },
+    { data: trendCacRaw },
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
-      .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date'),
+      .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date').limit(10000),
     supabase.from('contacts').select('month, original_source, viable, enrolled')
-      .in('month', last12),
+      .in('month', last12).in('original_source', ['Paid Search', 'Paid Social']).limit(10000),
     supabase.from('ad_spend').select('date, spend')
-      .gte('date', '2024-01-01').lte('date', todayStr),
+      .gte('date', '2024-01-01').lte('date', todayStr).limit(10000),
     supabase.from('ad_spend').select('date, platform, spend')
       .gte('date', eightWeeksAgo.toISOString().split('T')[0]).lte('date', todayStr),
     supabase.from('ad_spend').select('date, platform, spend')
@@ -143,6 +144,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
           .lte('enrolled_at', todayStr)
       : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount')
           .in('month', activeMonths),
+    supabase.from('cac_metrics').select('month, course, enrollments')
+      .in('month', trendMonths),
   ] as const)
 
   // ── Booking revenue: sum deal_amount for active-period enrollments ───
@@ -288,6 +291,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       bookingRevenueMtd={bookingRevenueMtd}
       customMonth={customMonth}
       enrolledNames={enrolledNames}
+      trendCacRows={trendCacRaw ?? []}
     />
   )
 }
@@ -299,6 +303,7 @@ interface CacRow {
   segment: string | null; source: string | null
   leads: number; enrollments: number; cvr: number; spend: number; cpl: number; cac: number
 }
+interface TrendCacRow { month: string; course: string | null; enrollments: number }
 interface RollingRow {
   as_of_date: string; course: string | null; university: string | null; segment: string | null; source: string | null
   leads_90d: number; enrollments_90d: number; spend_90d: number
@@ -337,6 +342,7 @@ interface ContentProps {
   monthlyCacData: { month: string; B2C: number; WFD: number; B2C_enroll: number; WFD_enroll: number }[]
   bookingRevenueMtd: number
   enrolledNames: MtdEnrolledContact[]
+  trendCacRows: TrendCacRow[]
 }
 
 // ── Content component ────────────────────────────────────────────────────────
@@ -344,7 +350,7 @@ interface ContentProps {
 function CacReportContent({
   period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
-  salesCycleData, monthlyCacData, bookingRevenueMtd, enrolledNames,
+  salesCycleData, monthlyCacData, bookingRevenueMtd, enrolledNames, trendCacRows,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -445,7 +451,7 @@ function CacReportContent({
     const prefix = `20${yr}-${MONTH_MAP[mon]}`
     const point: Record<string, number | string> = { month }
     for (const course of COURSES) {
-      const enroll = cacRows.filter((r) => r.month === month && r.course === course)
+      const enroll = trendCacRows.filter((r) => r.month === month && r.course === course)
         .reduce((s, r) => s + r.enrollments, 0)
       const spend = trendSpendRows.filter((r) => r.date.startsWith(prefix) && r.course === course)
         .reduce((s, r) => s + Number(r.spend), 0)
