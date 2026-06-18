@@ -42,7 +42,7 @@ export async function fetchCampaignPerformance(
       segments.date
     FROM campaign
     WHERE segments.date BETWEEN '${fmt(start)}' AND '${fmt(end)}'
-      AND campaign.status = 'ENABLED'
+      AND campaign.status != 'REMOVED'
     ORDER BY segments.date DESC
   `.trim()
 
