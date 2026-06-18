@@ -2,7 +2,7 @@
 
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, LabelList, Cell,
+  Tooltip, ResponsiveContainer, LabelList,
 } from 'recharts'
 
 interface MonthlyCacPoint {
@@ -68,10 +68,7 @@ export default function MonthlyCacBarChart({ data }: Props) {
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
             formatter={(v: unknown) => [hasSpend ? fmtCac(v) : `${Number(v)} enrollments`, 'Blended CAC']}
           />
-          <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={22}>
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={chartData[i].value > 0 ? '#2563EB' : '#E2E8F0'} />
-            ))}
+          <Bar dataKey="value" fill="#2563EB" radius={[3, 3, 0, 0]} maxBarSize={22}>
             <LabelList
               dataKey="value"
               position="top"
