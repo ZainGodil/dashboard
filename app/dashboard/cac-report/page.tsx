@@ -179,24 +179,18 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     })
   }
 
-  // ── Monthly CAC by segment ───────────────────────────────────────────
+  // ── Monthly blended CAC ─────────────────────────────────────────────
   // Dedup spend at (course, university) — cac_metrics copies the same spend to every source row
   const monthlyCacData = last12.map((month) => {
     const rows = (monthlyCacRaw ?? []).filter((r) => r.month === month)
-    const segData = (seg: string) => {
-      const sr = rows.filter((r) => r.segment === seg)
-      const seen = new Set<string>()
-      let spend = 0
-      for (const r of sr) {
-        const key = `${r.course ?? ''}|${r.university ?? ''}`
-        if (!seen.has(key)) { seen.add(key); spend += Number(r.spend) }
-      }
-      const enroll = sr.reduce((s, r) => s + r.enrollments, 0)
-      return { cac: enroll > 0 ? Math.round(spend / enroll) : 0, enroll }
+    const seen = new Set<string>()
+    let spend = 0
+    for (const r of rows) {
+      const key = `${r.course ?? ''}|${r.university ?? ''}`
+      if (!seen.has(key)) { seen.add(key); spend += Number(r.spend) }
     }
-    const b2c = segData('B2C')
-    const wfd = segData('WFD')
-    return { month, B2C: b2c.cac, WFD: wfd.cac, B2C_enroll: b2c.enroll, WFD_enroll: wfd.enroll }
+    const enrollments = rows.reduce((s, r) => s + r.enrollments, 0)
+    return { month, cac: enrollments > 0 ? Math.round(spend / enrollments) : 0, enrollments }
   })
 
   // ── Aggregate chart data ─────────────────────────────────────────
@@ -339,7 +333,7 @@ interface ContentProps {
   dailyData: DayPoint[]
   currentMonthLabel: string
   salesCycleData: { month: string; days: number }[]
-  monthlyCacData: { month: string; B2C: number; WFD: number; B2C_enroll: number; WFD_enroll: number }[]
+  monthlyCacData: { month: string; cac: number; enrollments: number }[]
   bookingRevenueMtd: number
   enrolledNames: MtdEnrolledContact[]
   trendCacRows: TrendCacRow[]
