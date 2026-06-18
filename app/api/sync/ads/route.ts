@@ -3,6 +3,13 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { fetchCampaignPerformance } from '@/lib/google-ads/campaigns'
 import { fetchMetaCampaignPerformance } from '@/lib/meta/campaigns'
 import { isMetaConfigured } from '@/lib/meta/client'
+import { recomputeCacMetrics } from '@/lib/metrics/compute-cac'
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function dateToMonthLabel(dateStr: string): string {
+  const parts = dateStr.split('-')
+  return `${MONTH_NAMES[Number(parts[1]) - 1]}-${parts[0].slice(2)}`
+}
 
 export const maxDuration = 300
 
@@ -26,6 +33,7 @@ export async function GET(req: NextRequest) {
   const sinceDays = daysParam ? Math.min(Number(daysParam), 730) : isFullRefresh ? 90 : 30
 
   const results = { google: 0, meta: 0, errors: [] as string[] }
+  const allDates = new Set<string>()
 
   // --- Google Ads ---
   try {
@@ -51,6 +59,7 @@ export async function GET(req: NextRequest) {
       if (error) throw new Error(`Google upsert error: ${error.message}`)
     }
 
+    rows.forEach((r) => allDates.add(r.date))
     results.google = upsertRows.length
     await writeSyncLog(supabase, startedAt, 'google_ads', upsertRows.length, 'success', null)
   } catch (err) {
@@ -89,6 +98,7 @@ export async function GET(req: NextRequest) {
         if (error) throw new Error(`Meta upsert error: ${error.message}`)
       }
 
+      rows.forEach((r) => allDates.add(r.date))
       results.meta = upsertRows.length
       await writeSyncLog(supabase, startedAt, 'meta', upsertRows.length, 'success', null)
     } catch (err) {
@@ -98,6 +108,18 @@ export async function GET(req: NextRequest) {
     }
   } else {
     results.errors.push('meta: skipped (META_ACCESS_TOKEN not configured)')
+  }
+
+  // Recompute cac_metrics for every month touched by this sync so that
+  // cac_metrics.spend/cpl/cac always reflect the current ad_spend state.
+  if (allDates.size > 0) {
+    const months = [...new Set([...allDates].map(dateToMonthLabel))].sort()
+    try {
+      await recomputeCacMetrics(months)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      results.errors.push(`recompute: ${msg}`)
+    }
   }
 
   const hasErrors = results.errors.length > 0

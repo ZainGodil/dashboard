@@ -28,15 +28,22 @@ const SEGMENT_TOKENS: Record<string, Segment> = {
   'wioa': 'WFD',
 }
 
+// Campaign type indicators — not course/university/segment but useful for classification
+const TYPE_KEYWORDS = ['performance max', 'pmax', 'p-max', 'search', 'display', 'video', 'shopping', 'remarketing', 'retargeting', 'brand']
+
 export interface ParsedCampaign {
   course: Course | null
   university: University | null
   segment: Segment | null
   isWioa: boolean
   type: string | null
+  isPMax: boolean
 }
 
 export function parseCampaignName(name: string): ParsedCampaign {
+  const nameLower = name.toLowerCase()
+  const isPMax = TYPE_KEYWORDS.slice(0, 3).some((kw) => nameLower.includes(kw))
+
   const brackets = Array.from(name.matchAll(/\[([^\]]+)\]/g), (m) => m[1].trim())
 
   let course: Course | null = null
@@ -88,6 +95,7 @@ export function parseCampaignName(name: string): ParsedCampaign {
     university,
     segment,
     isWioa,
+    isPMax,
     type: typeTokens.length ? typeTokens.join(' | ') : null,
   }
 }

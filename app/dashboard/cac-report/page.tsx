@@ -135,7 +135,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .gte('date', monthStart).lte('date', todayStr),
     supabase.from('enrollments').select('hubspot_contact_id, enrolled_at, month')
       .in('month', last12).not('enrolled_at', 'is', null),
-    supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
+    supabase.from('cac_metrics').select('month, segment, course, university, enrollments')
       .in('month', last12),
     // Enrollments for the active period — used for names table, gauge count, and booking revenue
     is90d
