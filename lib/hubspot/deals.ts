@@ -58,15 +58,20 @@ export async function fetchMtdBookingRevenue(): Promise<number> {
   return total
 }
 
-// Returns Map<contactId, closedate (ISO string or null)>
-export async function fetchEnrolledContactIds(): Promise<Map<string, string | null>> {
-  const contactDates = new Map<string, string | null>()
+export interface EnrolledDealData {
+  closedate: string | null
+  amount: number
+}
+
+// Returns Map<contactId, { closedate, amount }>
+export async function fetchEnrolledContactIds(): Promise<Map<string, EnrolledDealData>> {
+  const contactDeals = new Map<string, EnrolledDealData>()
   let after: string | undefined
 
   do {
     const params = new URLSearchParams({
       limit: '100',
-      properties: 'dealstage,closedate',
+      properties: 'dealstage,closedate,amount',
       associations: 'contacts',
       ...(after ? { after } : {}),
     })
@@ -76,9 +81,10 @@ export async function fetchEnrolledContactIds(): Promise<Map<string, string | nu
     for (const deal of data.results) {
       if (ENROLLED_STAGES.has(deal.properties.dealstage ?? '')) {
         const closedate = deal.properties.closedate ?? null
+        const amount = Number(deal.properties.amount ?? 0)
         const contacts = deal.associations?.contacts?.results ?? []
         for (const c of contacts) {
-          if (!contactDates.has(c.id)) contactDates.set(c.id, closedate)
+          if (!contactDeals.has(c.id)) contactDeals.set(c.id, { closedate, amount })
         }
       }
     }
@@ -86,5 +92,5 @@ export async function fetchEnrolledContactIds(): Promise<Map<string, string | nu
     after = data.paging?.next?.after
   } while (after)
 
-  return contactDates
+  return contactDeals
 }

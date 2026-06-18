@@ -169,7 +169,8 @@ export async function GET(req: NextRequest) {
     const enrolledRows = rows
       .filter((r) => r.enrolled)
       .map((r) => {
-        const rawCloseDate = enrolledDealContactIds.get(r.hubspot_id) ?? null
+        const dealData = enrolledDealContactIds.get(r.hubspot_id) ?? null
+        const rawCloseDate = dealData?.closedate ?? null
         const enrolledAt = rawCloseDate
           ? new Date(rawCloseDate).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
           : r.create_date
@@ -181,6 +182,7 @@ export async function GET(req: NextRequest) {
           source: r.original_source,
           enrolled_at: enrolledAt,
           month: enrolledAt ? formatMonth(enrolledAt) : null,
+          deal_amount: dealData?.amount ?? null,
         }
       })
 

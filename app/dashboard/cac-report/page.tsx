@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getMonthsForPeriod, getLast6Months, getLast12Months, type Period } from '@/lib/metrics/periods'
-import { fetchMtdBookingRevenue } from '@/lib/hubspot/deals'
 import StatCard from '@/components/ui/StatCard'
 import GaugeCard from '@/components/charts/GaugeCard'
 import SbuCard from '@/components/ui/SbuCard'
@@ -122,7 +121,6 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: enrollmentDatesRaw },
     { data: monthlyCacRaw },
     { data: periodEnrollmentsRaw },
-    bookingRevenueMtd,
   ] = await Promise.all([
     supabase.from('ad_spend').select('date, platform, course, spend')
       .gte('date', monthLabelToStart(trendMonths[0])).lte('date', todayStr).order('date'),
@@ -138,15 +136,18 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .in('month', last12).not('enrolled_at', 'is', null),
     supabase.from('cac_metrics').select('month, segment, course, university, enrollments, spend')
       .in('month', last12),
-    // Enrollments for the active period — used for names table and gauge count
+    // Enrollments for the active period — used for names table, gauge count, and booking revenue
     is90d
-      ? supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month')
+      ? supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount')
           .gte('enrolled_at', new Date(today.getTime() - 90 * 86400000).toISOString().split('T')[0])
           .lte('enrolled_at', todayStr)
-      : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month')
+      : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount')
           .in('month', activeMonths),
-    fetchMtdBookingRevenue().catch(() => 0) as Promise<number>,
   ] as const)
+
+  // ── Booking revenue: sum deal_amount for active-period enrollments ───
+  const bookingRevenueMtd = (periodEnrollmentsRaw ?? [])
+    .reduce((sum, e) => sum + ((e as { deal_amount?: number | null }).deal_amount ?? 0), 0)
 
   // ── Sales cycle: avg days lead→enrollment per month ─────────────────
   const enrolledIds = (enrollmentDatesRaw ?? []).map((e) => e.hubspot_contact_id).filter(Boolean)
@@ -284,7 +285,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       currentMonthLabel={currentMonthLabel}
       salesCycleData={salesCycleData}
       monthlyCacData={monthlyCacData}
-      bookingRevenueMtd={bookingRevenueMtd as number}
+      bookingRevenueMtd={bookingRevenueMtd}
       customMonth={customMonth}
       enrolledNames={enrolledNames}
     />
