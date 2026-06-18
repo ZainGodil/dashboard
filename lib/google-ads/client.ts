@@ -1,5 +1,5 @@
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
-const ADS_BASE = 'https://googleads.googleapis.com/v25'
+const ADS_BASE = 'https://googleads.googleapis.com/v24'
 
 let cachedToken: string | null = null
 let tokenExpiresAt = 0
