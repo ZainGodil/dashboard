@@ -22,25 +22,24 @@ export async function GET(req: NextRequest) {
   // for large result sets, unlike createServerClient from @supabase/ssr.
   const supabase = createAdminClient()
 
-  // Fetch in two windows to avoid the 1000-row PostgREST cap on any single query.
-  // Use range() for explicit pagination: first 5000, next 5000.
+  // Use .limit(N) — this maps to the PostgREST ?limit= query parameter which is NOT
+  // subject to the max-rows cap (unlike the Range header used by .range()).
+  // page.tsx relies on the same behaviour to return >1000 rows from this table.
   const [
-    { data: spendA },
-    { data: spendB },
+    { data: spendRows },
     { data: syncLogs },
     { count: totalRows },
     { data: latestRow },
     { data: oldestRow },
   ] = await Promise.all([
-    supabase.from('ad_spend').select('date, platform, spend').gte('date', '2024-01-01').order('date').range(0, 4999),
-    supabase.from('ad_spend').select('date, platform, spend').gte('date', '2024-01-01').order('date').range(5000, 9999),
+    supabase.from('ad_spend').select('date, platform, spend').gte('date', '2024-01-01').order('date').limit(20000),
     supabase.from('sync_log').select('source, completed_at, records_synced, status').order('completed_at', { ascending: false }).limit(20),
     supabase.from('ad_spend').select('*', { count: 'exact', head: true }),
     supabase.from('ad_spend').select('date').order('date', { ascending: false }).limit(1),
     supabase.from('ad_spend').select('date').order('date', { ascending: true }).limit(1),
   ])
 
-  const allRows = [...(spendA ?? []), ...(spendB ?? [])]
+  const allRows = spendRows ?? []
 
   type MonthData = { google_rows: number; meta_rows: number; google_spend: number; meta_spend: number }
   const coverage = new Map<string, MonthData>()
