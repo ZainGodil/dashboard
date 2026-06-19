@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 
 function isAuthorized(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
@@ -18,31 +18,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createServiceClient()
+  // Use the plain supabase-js admin client — it sends the correct Range header
+  // for large result sets, unlike createServerClient from @supabase/ssr.
+  const supabase = createAdminClient()
 
-  const [{ data: spendRows }, { data: syncLogs }, { count: totalRows }, { data: latestRow }, { data: oldestRow }] = await Promise.all([
-    supabase
-      .from('ad_spend')
-      .select('date, platform, spend')
-      .gte('date', '2024-01-01')
-      .order('date')
-      .limit(50000),
-    supabase
-      .from('sync_log')
-      .select('source, completed_at, records_synced, status')
-      .order('completed_at', { ascending: false })
-      .limit(20),
+  // Fetch in two windows to avoid the 1000-row PostgREST cap on any single query.
+  // Use range() for explicit pagination: first 5000, next 5000.
+  const [
+    { data: spendA },
+    { data: spendB },
+    { data: syncLogs },
+    { count: totalRows },
+    { data: latestRow },
+    { data: oldestRow },
+  ] = await Promise.all([
+    supabase.from('ad_spend').select('date, platform, spend').gte('date', '2024-01-01').order('date').range(0, 4999),
+    supabase.from('ad_spend').select('date, platform, spend').gte('date', '2024-01-01').order('date').range(5000, 9999),
+    supabase.from('sync_log').select('source, completed_at, records_synced, status').order('completed_at', { ascending: false }).limit(20),
     supabase.from('ad_spend').select('*', { count: 'exact', head: true }),
     supabase.from('ad_spend').select('date').order('date', { ascending: false }).limit(1),
     supabase.from('ad_spend').select('date').order('date', { ascending: true }).limit(1),
   ])
 
-  // Aggregate by (year-month, platform)
+  const allRows = [...(spendA ?? []), ...(spendB ?? [])]
+
   type MonthData = { google_rows: number; meta_rows: number; google_spend: number; meta_spend: number }
   const coverage = new Map<string, MonthData>()
 
-  for (const row of spendRows ?? []) {
-    const key = row.date.slice(0, 7) // "2026-04"
+  for (const row of allRows) {
+    const key = String(row.date).slice(0, 7)
     const cur = coverage.get(key) ?? { google_rows: 0, meta_rows: 0, google_spend: 0, meta_spend: 0 }
     if (row.platform === 'google') {
       cur.google_rows++
@@ -79,6 +83,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     db_summary: {
       total_rows: totalRows ?? 0,
+      rows_fetched: allRows.length,
       oldest_date: oldestRow?.[0]?.date ?? null,
       newest_date: latestRow?.[0]?.date ?? null,
     },
