@@ -32,8 +32,14 @@ export async function GET(req: NextRequest) {
   const daysParam = req.nextUrl.searchParams.get('days')
   const sinceDays = daysParam ? Math.min(Number(daysParam), 730) : isFullRefresh ? 90 : 30
 
-  const results = { google: 0, meta: 0, errors: [] as string[] }
+  const results: {
+    google: number; meta: number; errors: string[]
+    google_date_range?: { min: string; max: string }
+    meta_date_range?: { min: string; max: string }
+    upsert_errors?: string[]
+  } = { google: 0, meta: 0, errors: [] }
   const allDates = new Set<string>()
+  const upsertErrors: string[] = []
 
   // --- Google Ads ---
   try {
@@ -51,12 +57,20 @@ export async function GET(req: NextRequest) {
       synced_at: new Date().toISOString(),
     }))
 
+    const dates = rows.map((r) => r.date).sort()
+    if (dates.length) {
+      results.google_date_range = { min: dates[0], max: dates[dates.length - 1] }
+    }
+
     const BATCH = 500
     for (let i = 0; i < upsertRows.length; i += BATCH) {
       const { error } = await supabase
         .from('ad_spend')
         .upsert(upsertRows.slice(i, i + BATCH), { onConflict: 'date,platform,campaign_name' })
-      if (error) throw new Error(`Google upsert error: ${error.message}`)
+      if (error) {
+        upsertErrors.push(`google batch ${i}: ${error.message} (code=${error.code})`)
+        throw new Error(`Google upsert error: ${error.message}`)
+      }
     }
 
     rows.forEach((r) => allDates.add(r.date))
@@ -90,12 +104,20 @@ export async function GET(req: NextRequest) {
         synced_at: new Date().toISOString(),
       }))
 
+      const metaDates = rows.map((r) => r.date).sort()
+      if (metaDates.length) {
+        results.meta_date_range = { min: metaDates[0], max: metaDates[metaDates.length - 1] }
+      }
+
       const BATCH = 500
       for (let i = 0; i < upsertRows.length; i += BATCH) {
         const { error } = await supabase
           .from('ad_spend')
           .upsert(upsertRows.slice(i, i + BATCH), { onConflict: 'date,platform,campaign_name' })
-        if (error) throw new Error(`Meta upsert error: ${error.message}`)
+        if (error) {
+          upsertErrors.push(`meta batch ${i}: ${error.message} (code=${error.code})`)
+          throw new Error(`Meta upsert error: ${error.message}`)
+        }
       }
 
       rows.forEach((r) => allDates.add(r.date))
@@ -122,6 +144,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (upsertErrors.length) results.upsert_errors = upsertErrors
   const hasErrors = results.errors.length > 0
   return NextResponse.json(results, { status: hasErrors && results.google === 0 ? 500 : 200 })
 }

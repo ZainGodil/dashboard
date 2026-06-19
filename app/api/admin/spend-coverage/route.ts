@@ -20,11 +20,11 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  const [{ data: spendRows }, { data: syncLogs }] = await Promise.all([
+  const [{ data: spendRows }, { data: syncLogs }, { count: totalRows }, { data: latestRow }, { data: oldestRow }] = await Promise.all([
     supabase
       .from('ad_spend')
       .select('date, platform, spend')
-      .gte('date', '2025-01-01')
+      .gte('date', '2024-01-01')
       .order('date')
       .limit(50000),
     supabase
@@ -32,6 +32,9 @@ export async function GET(req: NextRequest) {
       .select('source, completed_at, records_synced, status')
       .order('completed_at', { ascending: false })
       .limit(20),
+    supabase.from('ad_spend').select('*', { count: 'exact', head: true }),
+    supabase.from('ad_spend').select('date').order('date', { ascending: false }).limit(1),
+    supabase.from('ad_spend').select('date').order('date', { ascending: true }).limit(1),
   ])
 
   // Aggregate by (year-month, platform)
@@ -73,5 +76,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ months, last_syncs: lastSyncs })
+  return NextResponse.json({
+    db_summary: {
+      total_rows: totalRows ?? 0,
+      oldest_date: oldestRow?.[0]?.date ?? null,
+      newest_date: latestRow?.[0]?.date ?? null,
+    },
+    months,
+    last_syncs: lastSyncs,
+  })
 }
