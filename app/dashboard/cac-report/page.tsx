@@ -112,8 +112,23 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   eightWeeksAgo.setDate(today.getDate() - 56)
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
 
+  // Supabase PostgREST max-rows caps every query at 1000 rows by default.
+  // The 12-month window has ~2400 rows, so one query would only return the oldest 1000 (Jun-Oct 2025).
+  // Work-around: split into 4 quarterly queries that each stay under 1000 rows (~600 each).
+  // Permanent fix: Settings → API → Max Rows → 10000 in the Supabase dashboard.
+  const trendSpendQuarters = await Promise.all([
+    supabase.from('ad_spend').select('date, platform, course, spend')
+      .gte('date', monthLabelToStart(last12[0])).lte('date', monthLabelToEnd(last12[2])).order('date').limit(1000),
+    supabase.from('ad_spend').select('date, platform, course, spend')
+      .gte('date', monthLabelToStart(last12[3])).lte('date', monthLabelToEnd(last12[5])).order('date').limit(1000),
+    supabase.from('ad_spend').select('date, platform, course, spend')
+      .gte('date', monthLabelToStart(last12[6])).lte('date', monthLabelToEnd(last12[8])).order('date').limit(1000),
+    supabase.from('ad_spend').select('date, platform, course, spend')
+      .gte('date', monthLabelToStart(last12[9])).lte('date', todayStr).order('date').limit(1000),
+  ])
+  const trendSpendRaw = trendSpendQuarters.flatMap(({ data }) => data ?? [])
+
   const [
-    { data: trendSpendRaw },
     { data: l2eContactsRaw },
     { data: yoySpendRaw },
     { data: weeklySpendRaw },
@@ -123,8 +138,6 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     { data: periodEnrollmentsRaw },
     { data: trendCacRaw },
   ] = await Promise.all([
-    supabase.from('ad_spend').select('date, platform, course, spend')
-      .gte('date', monthLabelToStart(last12[0])).lte('date', todayStr).order('date').limit(10000),
     supabase.from('contacts').select('month, original_source, viable, enrolled')
       .in('month', last12).in('original_source', ['Paid Search', 'Paid Social']).limit(10000),
     supabase.from('ad_spend').select('date, spend')
