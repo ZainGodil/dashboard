@@ -16,7 +16,7 @@ interface Props { data: MonthlyCacPoint[] }
 const fmtCac = (v: unknown) => {
   const n = Number(v)
   if (!n) return ''
-  return n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${n}`
+  return n >= 1000 ? `$${(n / 1000).toFixed(2)}K` : `$${n.toFixed(2)}`
 }
 
 export default function MonthlyCacBarChart({ data }: Props) {

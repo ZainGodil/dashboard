@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+
+async function requireSession() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
 
 export async function GET() {
+  const user = await requireSession()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('goals')
@@ -14,6 +23,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await requireSession()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json() as {
     period_type: string
     period: string

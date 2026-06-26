@@ -530,38 +530,38 @@ function CacReportContent({
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
           <StatCard
             label="Bookings MTD"
-            value={bookingRevenueMtd > 0 ? `$${fmt$(bookingRevenueMtd)}` : '—'}
+            value={bookingRevenueMtd > 0 ? `$${Math.round(bookingRevenueMtd).toLocaleString()}` : '—'}
             accent="green"
           />
-          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${fmt$(blendedCpl)}` : '—'} accent="teal" />
-          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${fmt$(blendedCac)}` : '—'} accent="amber" />
+          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : '—'} accent="teal" />
+          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
         </div>
 
         {/* Row 2: Platform spend tiles — Total Spend first */}
         <div className="grid grid-cols-5 gap-3">
           <StatCard
             label={`Total Spend ${periodLabel}`}
-            value={(googleSpend + metaSpend) > 0 ? `$${fmt$(googleSpend + metaSpend)}` : '—'}
+            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
             accent="amber"
           />
           <StatCard
             label={`Google Spend ${periodLabel}`}
-            value={googleSpend > 0 ? `$${fmt$(googleSpend)}` : '—'}
+            value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
             accent="blue"
           />
           <StatCard
             label={`Meta Spend ${periodLabel}`}
-            value={metaSpend > 0 ? `$${fmt$(metaSpend)}` : '—'}
+            value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : '—'}
             accent="teal"
           />
           <StatCard
             label="Google CPL"
-            value={googleCpl > 0 ? `$${fmt$(googleCpl)}` : '—'}
+            value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : '—'}
             accent="blue"
           />
           <StatCard
             label="Meta CPL"
-            value={metaCpl > 0 ? `$${fmt$(metaCpl)}` : '—'}
+            value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : '—'}
             accent="teal"
           />
         </div>
@@ -619,7 +619,7 @@ function CacReportContent({
           <GaugeCard
             label={`Spend ${periodLabel}`}
             value={totalSpend}
-            displayValue={totalSpend > 0 ? `$${(totalSpend / 1000).toFixed(1)}k` : '—'}
+            displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
             max={250000}
             color="#2563EB"
             formatMin="$0"
