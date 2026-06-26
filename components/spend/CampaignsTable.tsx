@@ -9,6 +9,14 @@ const COURSE_OPTIONS = [
   'General',
 ] as const
 
+const UNIVERSITY_OPTIONS = [
+  'UTA',
+  'NEIU',
+  'Hofstra',
+  'UTSA',
+  'WFI',
+] as const
+
 interface Campaign {
   name: string
   university: string | null
@@ -27,26 +35,36 @@ export default function CampaignsTable({ campaigns: initial, totalSpend, platfor
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  async function updateProgram(name: string, course: string | null) {
+  async function saveOverride(name: string, course: string | null, university: string | null) {
     setSaving((prev) => ({ ...prev, [name]: true }))
     setErrors((prev) => ({ ...prev, [name]: '' }))
 
     const res = await fetch('/api/campaigns/program', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_name: name, platform, course: course || null }),
+      body: JSON.stringify({ campaign_name: name, platform, course: course || null, university: university || null }),
     })
 
-    if (res.ok) {
-      setCampaigns((prev) =>
-        prev.map((c) => (c.name === name ? { ...c, course: course || null } : c))
-      )
-    } else {
+    if (!res.ok) {
       const err = await res.json() as { error?: string }
       setErrors((prev) => ({ ...prev, [name]: err.error ?? 'Save failed' }))
     }
 
     setSaving((prev) => ({ ...prev, [name]: false }))
+  }
+
+  function onCourseChange(name: string, newCourse: string) {
+    const current = campaigns.find((c) => c.name === name)
+    const updated = newCourse || null
+    setCampaigns((prev) => prev.map((c) => c.name === name ? { ...c, course: updated } : c))
+    saveOverride(name, updated, current?.university ?? null)
+  }
+
+  function onUniversityChange(name: string, newUniversity: string) {
+    const current = campaigns.find((c) => c.name === name)
+    const updated = newUniversity || null
+    setCampaigns((prev) => prev.map((c) => c.name === name ? { ...c, university: updated } : c))
+    saveOverride(name, current?.course ?? null, updated)
   }
 
   return (
@@ -56,8 +74,8 @@ export default function CampaignsTable({ campaigns: initial, totalSpend, platfor
           <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
             <th className="text-left px-4 py-2.5 font-semibold w-8">#</th>
             <th className="text-left px-4 py-2.5 font-semibold">Campaign</th>
-            <th className="text-left px-4 py-2.5 font-semibold">Campus</th>
-            <th className="text-left px-4 py-2.5 font-semibold">Program</th>
+            <th className="text-left px-3 py-2.5 font-semibold">Campus</th>
+            <th className="text-left px-3 py-2.5 font-semibold">Program</th>
             <th className="text-right px-4 py-2.5 font-semibold">Spend</th>
             <th className="text-right px-4 py-2.5 font-semibold">% of Total</th>
           </tr>
@@ -65,16 +83,30 @@ export default function CampaignsTable({ campaigns: initial, totalSpend, platfor
         <tbody className="divide-y divide-slate-100">
           {campaigns.map((c, i) => (
             <tr key={c.name} className="hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-2.5 text-slate-400 tabular-nums text-[11px]">{i + 1}</td>
-              <td className="px-4 py-2.5 text-slate-700 font-mono text-[11px] max-w-[320px] truncate" title={c.name}>
+              <td className="px-4 py-2 text-slate-400 tabular-nums text-[11px]">{i + 1}</td>
+              <td className="px-4 py-2 text-slate-700 font-mono text-[11px] max-w-[280px] truncate" title={c.name}>
                 {c.name}
               </td>
-              <td className="px-4 py-2.5 text-slate-600">{c.university ?? '—'}</td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-1.5">
+                <div className="flex items-center gap-1">
+                  <select
+                    value={c.university ?? ''}
+                    onChange={(e) => onUniversityChange(c.name, e.target.value)}
+                    disabled={saving[c.name]}
+                    className="px-2 py-1 rounded border border-slate-200 text-[12px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 disabled:opacity-50 cursor-pointer"
+                  >
+                    <option value="">—</option>
+                    {UNIVERSITY_OPTIONS.map((o) => (
+                      <option key={o} value={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+              </td>
+              <td className="px-3 py-1.5">
                 <div className="flex items-center gap-1.5">
                   <select
                     value={c.course ?? ''}
-                    onChange={(e) => updateProgram(c.name, e.target.value || null)}
+                    onChange={(e) => onCourseChange(c.name, e.target.value)}
                     disabled={saving[c.name]}
                     className="px-2 py-1 rounded border border-slate-200 text-[12px] text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400 disabled:opacity-50 cursor-pointer"
                   >
@@ -93,10 +125,10 @@ export default function CampaignsTable({ campaigns: initial, totalSpend, platfor
                   )}
                 </div>
               </td>
-              <td className="px-4 py-2.5 text-right text-slate-800 font-semibold tabular-nums">
+              <td className="px-4 py-2 text-right text-slate-800 font-semibold tabular-nums">
                 ${Math.round(c.spend).toLocaleString()}
               </td>
-              <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
+              <td className="px-4 py-2 text-right text-slate-500 tabular-nums">
                 {totalSpend > 0 ? `${((c.spend / totalSpend) * 100).toFixed(1)}%` : '—'}
               </td>
             </tr>

@@ -1,4 +1,4 @@
-export type University = 'UTA' | 'WFI' | 'Hofstra' | 'NEIU' | 'SCU'
+export type University = 'UTA' | 'WFI' | 'Hofstra' | 'NEIU' | 'SCU' | 'UTSA'
 export type Course = 'Digital Marketing' | 'UI/UX Design' | 'Generative AI Data Analyst' | 'General'
 export type Segment = 'B2C' | 'WFD'
 export type SalesSegment = 'B2HE' | 'B2G'

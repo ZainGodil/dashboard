@@ -41,8 +41,12 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
     .lte('date', endDate)
   if (university) q = q.eq('university', university)
 
-  const { data } = await q.order('spend', { ascending: false })
+  const [{ data }, { data: overridesData }] = await Promise.all([
+    q.order('spend', { ascending: false }),
+    supabase.from('campaign_overrides').select('campaign_name, course, university').eq('platform', 'google'),
+  ])
   const rows = data ?? []
+  const overrideMap = new Map((overridesData ?? []).map((o) => [o.campaign_name, o]))
 
   const totalSpend = rows.reduce((s, r) => s + Number(r.spend), 0)
   const totalImpressions = rows.reduce((s, r) => s + (r.impressions ?? 0), 0)
@@ -50,10 +54,13 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
   const avgCpc = totalClicks > 0 ? totalSpend / totalClicks : 0
   const uniqueCampaigns = new Set(rows.map((r) => r.campaign_name)).size
 
-  // Aggregate by university × course
+  // Aggregate by university × course (override takes precedence per campaign)
   const aggMap = new Map<string, { spend: number; impressions: number; clicks: number }>()
   for (const r of rows) {
-    const key = `${r.university ?? 'Unknown'}|||${r.course ?? 'General'}`
+    const ov = overrideMap.get(r.campaign_name ?? '')
+    const uni = ov?.university ?? r.university ?? 'Unknown'
+    const course = ov?.course ?? r.course ?? 'General'
+    const key = `${uni}|||${course}`
     const cur = aggMap.get(key) ?? { spend: 0, impressions: 0, clicks: 0 }
     aggMap.set(key, {
       spend: cur.spend + Number(r.spend),
@@ -69,11 +76,16 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
     })
     .sort((a, b) => b.spend - a.spend)
 
-  // Top campaigns (aggregate across dates)
+  // All campaigns (aggregate across dates, overrides applied)
   const campaignMap = new Map<string, { spend: number; university: string | null; course: string | null }>()
   for (const r of rows) {
     const name = r.campaign_name ?? 'Unknown'
-    const cur = campaignMap.get(name) ?? { spend: 0, university: r.university, course: r.course }
+    const ov = overrideMap.get(name)
+    const cur = campaignMap.get(name) ?? {
+      spend: 0,
+      university: ov?.university ?? r.university,
+      course: ov?.course ?? r.course,
+    }
     campaignMap.set(name, { ...cur, spend: cur.spend + Number(r.spend) })
   }
   const allCampaigns = Array.from(campaignMap.entries())
