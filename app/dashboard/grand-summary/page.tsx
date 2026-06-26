@@ -52,6 +52,7 @@ interface SummaryRow {
   fbSpend: number
   leadsBySource: Record<string, number>
   totalLeads: number
+  enrollmentsBySource: Record<string, number>
   enrollments: number
 }
 
@@ -135,13 +136,16 @@ function buildRows(
     spendMap.set(key, cur)
   }
 
-  const aggMap = new Map<string, { leadsBySource: Record<string, number>; totalLeads: number; enrollments: number }>()
+  const aggMap = new Map<string, { leadsBySource: Record<string, number>; totalLeads: number; enrollmentsBySource: Record<string, number>; enrollments: number }>()
   for (const r of cacRows) {
     const key = `${r.course ?? ''}|||${r.university ?? ''}`
-    const cur = aggMap.get(key) ?? { leadsBySource: {}, totalLeads: 0, enrollments: 0 }
+    const cur = aggMap.get(key) ?? { leadsBySource: {}, totalLeads: 0, enrollmentsBySource: {}, enrollments: 0 }
     const src = r.source ?? 'Other'
     cur.leadsBySource[src] = (cur.leadsBySource[src] ?? 0) + r.leads
     cur.totalLeads += r.leads
+    if (r.enrollments > 0) {
+      cur.enrollmentsBySource[src] = (cur.enrollmentsBySource[src] ?? 0) + r.enrollments
+    }
     cur.enrollments += r.enrollments
     aggMap.set(key, cur)
   }
@@ -152,7 +156,7 @@ function buildRows(
   for (const key of allKeys) {
     const [course, university] = key.split('|||')
     const spend = spendMap.get(key) ?? { google: 0, meta: 0 }
-    const agg = aggMap.get(key) ?? { leadsBySource: {}, totalLeads: 0, enrollments: 0 }
+    const agg = aggMap.get(key) ?? { leadsBySource: {}, totalLeads: 0, enrollmentsBySource: {}, enrollments: 0 }
     rows.push({
       course: course || 'General',
       university: university || null,
@@ -160,6 +164,7 @@ function buildRows(
       fbSpend: spend.meta,
       leadsBySource: agg.leadsBySource,
       totalLeads: agg.totalLeads,
+      enrollmentsBySource: agg.enrollmentsBySource,
       enrollments: agg.enrollments,
     })
   }
@@ -185,6 +190,10 @@ function addRows(a: SummaryRow, b: SummaryRow): SummaryRow {
   for (const [src, n] of Object.entries(b.leadsBySource)) {
     leadsBySource[src] = (leadsBySource[src] ?? 0) + n
   }
+  const enrollmentsBySource = { ...a.enrollmentsBySource }
+  for (const [src, n] of Object.entries(b.enrollmentsBySource)) {
+    enrollmentsBySource[src] = (enrollmentsBySource[src] ?? 0) + n
+  }
   return {
     course: a.course,
     university: null,
@@ -192,12 +201,13 @@ function addRows(a: SummaryRow, b: SummaryRow): SummaryRow {
     fbSpend: a.fbSpend + b.fbSpend,
     leadsBySource,
     totalLeads: a.totalLeads + b.totalLeads,
+    enrollmentsBySource,
     enrollments: a.enrollments + b.enrollments,
   }
 }
 
 function emptyRow(course = ''): SummaryRow {
-  return { course, university: null, gSpend: 0, fbSpend: 0, leadsBySource: {}, totalLeads: 0, enrollments: 0 }
+  return { course, university: null, gSpend: 0, fbSpend: 0, leadsBySource: {}, totalLeads: 0, enrollmentsBySource: {}, enrollments: 0 }
 }
 
 // ── Content component ────────────────────────────────────────────────────────
@@ -205,17 +215,28 @@ function emptyRow(course = ''): SummaryRow {
 function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRow[] }) {
   const periodLabel = PERIOD_LABELS[period]
 
-  // Determine which source columns have any data across all rows
+  // Determine which lead source columns have any data
   const sourceTotals: Record<string, number> = {}
   for (const r of rows) {
     for (const [src, n] of Object.entries(r.leadsBySource)) {
       sourceTotals[src] = (sourceTotals[src] ?? 0) + n
     }
   }
-  // Preserve canonical order, only include sources with data; append any unknown sources at end
   const activeSources = [
     ...ALL_SOURCES.filter((s) => (sourceTotals[s] ?? 0) > 0),
     ...Object.keys(sourceTotals).filter((s) => !ALL_SOURCES.includes(s) && sourceTotals[s] > 0),
+  ]
+
+  // Determine which enrollment source columns have any data
+  const enrollTotals: Record<string, number> = {}
+  for (const r of rows) {
+    for (const [src, n] of Object.entries(r.enrollmentsBySource)) {
+      enrollTotals[src] = (enrollTotals[src] ?? 0) + n
+    }
+  }
+  const activeEnrollSources = [
+    ...ALL_SOURCES.filter((s) => (enrollTotals[s] ?? 0) > 0),
+    ...Object.keys(enrollTotals).filter((s) => !ALL_SOURCES.includes(s) && enrollTotals[s] > 0),
   ]
 
   const grandTotal = rows.reduce((acc, r) => addRows(acc, r), emptyRow())
@@ -230,7 +251,7 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
   }
 
   // Total colspan for "no data" cell
-  const totalCols = 1 + 3 + activeSources.length + 1 + 1 + 2 + 3 + 1
+  const totalCols = 1 + 3 + activeSources.length + 1 + activeEnrollSources.length + 2 + 3 + 1
 
   return (
     <div>
@@ -288,7 +309,7 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
                   <th className="text-left px-4 py-2 font-semibold sticky left-0 bg-slate-50 z-10" rowSpan={2}>Program / Campus</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-blue-50 text-blue-600" colSpan={3}>Spend</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-teal-50 text-teal-600" colSpan={activeSources.length + 1}>Leads by Source</th>
-                  <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-green-50 text-green-600" colSpan={2}>Conversions</th>
+                  <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-green-50 text-green-600" colSpan={activeEnrollSources.length + 2}>Conversions</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-amber-50 text-amber-600" colSpan={3}>CPL</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-rose-50 text-rose-600" colSpan={1}>CAC</th>
                 </tr>
@@ -302,7 +323,12 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
                     </th>
                   ))}
                   <th className="text-right px-3 py-2 font-semibold font-bold">Total</th>
-                  <th className="text-right px-3 py-2 font-semibold border-l border-slate-200">Enrollments</th>
+                  {activeEnrollSources.map((src, i) => (
+                    <th key={src} className={`text-right px-3 py-2 font-semibold whitespace-nowrap ${i === 0 ? 'border-l border-slate-200' : ''}`}>
+                      {src}
+                    </th>
+                  ))}
+                  <th className={`text-right px-3 py-2 font-semibold font-bold ${activeEnrollSources.length === 0 ? 'border-l border-slate-200' : ''}`}>Enrollments</th>
                   <th className="text-right px-3 py-2 font-semibold">L2E%</th>
                   <th className="text-right px-3 py-2 font-semibold border-l border-slate-200">Google</th>
                   <th className="text-right px-3 py-2 font-semibold">Meta</th>
@@ -318,19 +344,19 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
                   const progRows = (byProgram.get(prog) ?? []).sort((a, b) => (b.gSpend + b.fbSpend) - (a.gSpend + a.fbSpend))
                   if (!progRows.length) return null
                   const pt = progRows.reduce((acc, r) => addRows(acc, r), emptyRow(prog))
-                  return <ProgramGroup key={prog} program={prog} totalRow={pt} campusRows={progRows} activeSources={activeSources} />
+                  return <ProgramGroup key={prog} program={prog} totalRow={pt} campusRows={progRows} activeSources={activeSources} activeEnrollSources={activeEnrollSources} />
                 })}
                 {Array.from(byProgram.keys())
                   .filter((p) => !PROGRAMS.includes(p))
                   .map((prog) => {
                     const progRows = (byProgram.get(prog) ?? []).sort((a, b) => (b.gSpend + b.fbSpend) - (a.gSpend + a.fbSpend))
                     const pt = progRows.reduce((acc, r) => addRows(acc, r), emptyRow(prog))
-                    return <ProgramGroup key={prog} program={prog} totalRow={pt} campusRows={progRows} activeSources={activeSources} />
+                    return <ProgramGroup key={prog} program={prog} totalRow={pt} campusRows={progRows} activeSources={activeSources} activeEnrollSources={activeEnrollSources} />
                   })}
               </tbody>
               {rows.length > 0 && (
                 <tfoot>
-                  <DataRow row={grandTotal} label="Grand Total" activeSources={activeSources} isTotal isGrandTotal />
+                  <DataRow row={grandTotal} label="Grand Total" activeSources={activeSources} activeEnrollSources={activeEnrollSources} isTotal isGrandTotal />
                 </tfoot>
               )}
             </table>
@@ -341,26 +367,28 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
   )
 }
 
-function ProgramGroup({ program, totalRow, campusRows, activeSources }: {
+function ProgramGroup({ program, totalRow, campusRows, activeSources, activeEnrollSources }: {
   program: string
   totalRow: SummaryRow
   campusRows: SummaryRow[]
   activeSources: string[]
+  activeEnrollSources: string[]
 }) {
   return (
     <>
-      <DataRow row={totalRow} label={program} activeSources={activeSources} isTotal />
+      <DataRow row={totalRow} label={program} activeSources={activeSources} activeEnrollSources={activeEnrollSources} isTotal />
       {campusRows.filter((r) => r.university).map((r, i) => (
-        <DataRow key={i} row={r} label={r.university!} activeSources={activeSources} indent />
+        <DataRow key={i} row={r} label={r.university!} activeSources={activeSources} activeEnrollSources={activeEnrollSources} indent />
       ))}
     </>
   )
 }
 
-function DataRow({ row, label, activeSources, isTotal, isGrandTotal, indent }: {
+function DataRow({ row, label, activeSources, activeEnrollSources, isTotal, isGrandTotal, indent }: {
   row: SummaryRow
   label: string
   activeSources: string[]
+  activeEnrollSources: string[]
   isTotal?: boolean
   isGrandTotal?: boolean
   indent?: boolean
@@ -394,7 +422,12 @@ function DataRow({ row, label, activeSources, isTotal, isGrandTotal, indent }: {
         </td>
       ))}
       <td className={`px-3 ${py} text-right tabular-nums font-semibold`}>{fmtN(row.totalLeads)}</td>
-      <td className={`px-3 ${py} text-right tabular-nums border-l border-slate-200`}>{fmtN(row.enrollments)}</td>
+      {activeEnrollSources.map((src, i) => (
+        <td key={src} className={`px-3 ${py} text-right tabular-nums ${i === 0 ? 'border-l border-slate-200' : ''}`}>
+          {fmtN(row.enrollmentsBySource[src] ?? 0)}
+        </td>
+      ))}
+      <td className={`px-3 ${py} text-right tabular-nums font-semibold ${activeEnrollSources.length === 0 ? 'border-l border-slate-200' : ''}`}>{fmtN(row.enrollments)}</td>
       <td className={`px-3 ${py} text-right tabular-nums`}>{fmtPct(m.l2e)}</td>
       <td className={`px-3 ${py} text-right tabular-nums border-l border-slate-200 text-blue-700`}>{fmt$(m.gCpl)}</td>
       <td className={`px-3 ${py} text-right tabular-nums text-teal-700`}>{fmt$(m.fbCpl)}</td>
