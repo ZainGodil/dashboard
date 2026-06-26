@@ -287,6 +287,21 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     }
   })
 
+  // ── Goals: fetch monthly goal for active period, yearly goal for current year ─
+  const goalMonth = customMonth ?? activeMonths[0] ?? null
+  const goalYear = String(today.getFullYear())
+
+  const goalPeriods: string[] = [goalYear]
+  if (goalMonth) goalPeriods.push(goalMonth)
+
+  const { data: goalsRaw } = await supabase
+    .from('goals')
+    .select('period_type, period, spend_target, leads_target, enrollments_target')
+    .in('period', goalPeriods)
+
+  const monthlyGoal = (goalsRaw ?? []).find((g) => g.period_type === 'monthly' && g.period === goalMonth) ?? null
+  const yearlyGoal  = (goalsRaw ?? []).find((g) => g.period_type === 'yearly'  && g.period === goalYear)  ?? null
+
   return (
     <CacReportContent
       period={period}
@@ -306,6 +321,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       customMonth={customMonth}
       enrolledNames={enrolledNames}
       trendCacRows={trendCacRaw ?? []}
+      monthlyGoal={monthlyGoal}
+      yearlyGoal={yearlyGoal}
     />
   )
 }
@@ -358,6 +375,8 @@ interface ContentProps {
   bookingRevenueMtd: number
   enrolledNames: MtdEnrolledContact[]
   trendCacRows: TrendCacRow[]
+  monthlyGoal: { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
+  yearlyGoal:  { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
 }
 
 // ── Content component ────────────────────────────────────────────────────────
@@ -366,6 +385,7 @@ function CacReportContent({
   period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
   salesCycleData, monthlyCacData, bookingRevenueMtd, enrolledNames, trendCacRows,
+  monthlyGoal, yearlyGoal,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -545,6 +565,54 @@ function CacReportContent({
             accent="teal"
           />
         </div>
+
+        {/* Goals vs Actuals */}
+        {(() => {
+          const goal = period === 'ytd' ? yearlyGoal : monthlyGoal
+          if (!goal || (goal.spend_target == null && goal.leads_target == null && goal.enrollments_target == null)) return null
+
+          const rows: { label: string; actual: number; target: number | null; fmt: (n: number) => string }[] = [
+            { label: 'Spend',        actual: totalSpend,        target: goal.spend_target,        fmt: (n: number) => `$${fmt$(n)}` },
+            { label: 'Leads',        actual: totalLeads,        target: goal.leads_target,        fmt: (n: number) => n.toLocaleString() },
+            { label: 'Enrollments',  actual: totalEnrollments,  target: goal.enrollments_target,  fmt: (n: number) => n.toLocaleString() },
+          ].filter((r) => r.target != null)
+
+          if (!rows.length) return null
+
+          return (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-semibold mb-3">
+                Goals vs Actuals — {period === 'ytd' ? 'Yearly' : periodLabel}
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {rows.map(({ label, actual, target, fmt: fmtVal }) => {
+                  const pct = target! > 0 ? Math.min((actual / target!) * 100, 100) : 0
+                  const over = target! > 0 && actual > target!
+                  return (
+                    <div key={label} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] font-medium text-slate-600">{label}</span>
+                        <span className={`text-[11px] font-semibold ${over ? 'text-emerald-600' : 'text-slate-500'}`}>
+                          {Math.round((actual / target!) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${over ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>{fmtVal(actual)}</span>
+                        <span>Goal: {fmtVal(target!)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Row 3: Gauges — follow active period */}
         <div className="grid grid-cols-4 gap-4">

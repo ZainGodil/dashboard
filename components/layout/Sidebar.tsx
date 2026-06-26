@@ -65,6 +65,20 @@ const NAV_REPORTS = [
   },
 ]
 
+const NAV_SETTINGS = [
+  {
+    href: '/dashboard/goals',
+    label: 'Goals',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="8" cy="8" r="6"/>
+        <circle cx="8" cy="8" r="3"/>
+        <path d="M8 2v1M8 13v1M2 8h1M13 8h1"/>
+      </svg>
+    ),
+  },
+]
+
 const NAV_SPEND = [
   {
     href: '/dashboard/spend/google',
@@ -199,6 +213,26 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
                   {badge}
                 </span>
               )}
+            </Link>
+          )
+        })}
+
+        <div className="px-3 pt-4 pb-2 text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Settings</div>
+        {NAV_SETTINGS.map(({ href, label, icon }) => {
+          const active = pathname.startsWith(href)
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium mb-0.5 transition-all border ${
+                active
+                  ? 'bg-blue-500/15 text-blue-400 border-blue-500/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700 border-transparent'
+              }`}
+            >
+              <span className={active ? 'opacity-100' : 'opacity-60'}>{icon}</span>
+              {label}
             </Link>
           )
         })}
