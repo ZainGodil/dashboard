@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import type { Period } from '@/lib/metrics/periods'
 import StatCard from '@/components/ui/StatCard'
 import SpendFilterBar from '../SpendFilterBar'
+import CampaignsTable from '@/components/spend/CampaignsTable'
 
 interface PageProps {
   searchParams: { period?: string; university?: string }
@@ -75,10 +76,9 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
     const cur = campaignMap.get(name) ?? { spend: 0, university: r.university, course: r.course }
     campaignMap.set(name, { ...cur, spend: cur.spend + Number(r.spend) })
   }
-  const topCampaigns = Array.from(campaignMap.entries())
+  const allCampaigns = Array.from(campaignMap.entries())
     .map(([name, d]) => ({ name, ...d }))
     .sort((a, b) => b.spend - a.spend)
-    .slice(0, 25)
 
   const periodLabel = PERIOD_LABELS[period]
 
@@ -152,41 +152,13 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Top Campaigns */}
+        {/* All Campaigns */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
-            <span className="font-display text-[13px] font-bold text-slate-900">Top Campaigns by Spend</span>
-            <span className="text-[11px] text-slate-400">top 25</span>
+            <span className="font-display text-[13px] font-bold text-slate-900">Campaigns by Spend</span>
+            <span className="text-[11px] text-slate-400">{allCampaigns.length} campaigns</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-[11px] uppercase tracking-wider">
-                  <th className="text-left px-4 py-2.5 font-semibold">Campaign</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Campus</th>
-                  <th className="text-left px-4 py-2.5 font-semibold">Program</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Spend</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">% of Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {topCampaigns.map((c, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-2.5 text-slate-700 font-mono text-[11px] max-w-[320px] truncate" title={c.name}>{c.name}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{c.university ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-slate-600">{c.course ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-800 font-semibold tabular-nums">${Math.round(c.spend).toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
-                      {totalSpend > 0 ? `${((c.spend / totalSpend) * 100).toFixed(1)}%` : '—'}
-                    </td>
-                  </tr>
-                ))}
-                {topCampaigns.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-[12px]">No data for this period</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <CampaignsTable campaigns={allCampaigns} totalSpend={totalSpend} platform="google" />
         </div>
       </div>
     </div>

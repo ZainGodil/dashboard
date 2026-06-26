@@ -9,6 +9,8 @@ const COURSE_TOKENS: Record<string, Course> = {
   'dig mkt': 'Digital Marketing',
   'generative ai': 'Generative AI Data Analyst',
   'gen ai': 'Generative AI Data Analyst',
+  'gen-ai': 'Generative AI Data Analyst',
+  'gai': 'Generative AI Data Analyst',
   'data analyst': 'Generative AI Data Analyst',
 }
 
