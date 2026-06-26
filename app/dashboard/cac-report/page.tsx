@@ -25,10 +25,6 @@ const MONTH_MAP: Record<string, string> = {
   Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12',
 }
 
-function fmt$(n: number): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function monthLabelToStart(label: string): string {
   const [mon, yr] = label.split('-')
   return `20${yr}-${MONTH_MAP[mon]}-01`
@@ -566,93 +562,65 @@ function CacReportContent({
           />
         </div>
 
-        {/* Goals vs Actuals */}
+        {/* Row 3: Gauges — max driven by goals when set, otherwise hardcoded fallback */}
         {(() => {
           const goal = period === 'ytd' ? yearlyGoal : monthlyGoal
-          if (!goal || (goal.spend_target == null && goal.leads_target == null && goal.enrollments_target == null)) return null
+          const spendMax   = goal?.spend_target        ?? 250000
+          const leadsMax   = goal?.leads_target        ?? 6000
+          const enrollMax  = goal?.enrollments_target  ?? 250
 
-          const rows: { label: string; actual: number; target: number | null; fmt: (n: number) => string }[] = [
-            { label: 'Spend',        actual: totalSpend,        target: goal.spend_target,        fmt: (n: number) => `$${fmt$(n)}` },
-            { label: 'Leads',        actual: totalLeads,        target: goal.leads_target,        fmt: (n: number) => n.toLocaleString() },
-            { label: 'Enrollments',  actual: totalEnrollments,  target: goal.enrollments_target,  fmt: (n: number) => n.toLocaleString() },
-          ].filter((r) => r.target != null)
+          const spendGoalPct  = goal?.spend_target        ? (totalSpend       / goal.spend_target)        * 100 : undefined
+          const leadsGoalPct  = goal?.leads_target        ? (totalLeads       / goal.leads_target)        * 100 : undefined
+          const enrollGoalPct = goal?.enrollments_target  ? (totalEnrollments / goal.enrollments_target)  * 100 : undefined
 
-          if (!rows.length) return null
+          const fmtSpendMax   = goal?.spend_target        ? `$${Math.round(goal.spend_target / 1000)}k`      : '$250k'
+          const fmtLeadsMax   = goal?.leads_target        ? goal.leads_target.toLocaleString()                : '6,000'
+          const fmtEnrollMax  = goal?.enrollments_target  ? goal.enrollments_target.toLocaleString()          : '250'
 
           return (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-semibold mb-3">
-                Goals vs Actuals — {period === 'ytd' ? 'Yearly' : periodLabel}
-              </p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {rows.map(({ label, actual, target, fmt: fmtVal }) => {
-                  const pct = target! > 0 ? Math.min((actual / target!) * 100, 100) : 0
-                  const over = target! > 0 && actual > target!
-                  return (
-                    <div key={label} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-medium text-slate-600">{label}</span>
-                        <span className={`text-[11px] font-semibold ${over ? 'text-emerald-600' : 'text-slate-500'}`}>
-                          {Math.round((actual / target!) * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${over ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{fmtVal(actual)}</span>
-                        <span>Goal: {fmtVal(target!)}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+            <div className="grid grid-cols-4 gap-4">
+              <GaugeCard
+                label={`Spend ${periodLabel}`}
+                value={totalSpend}
+                displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
+                max={spendMax}
+                color="#2563EB"
+                formatMin="$0"
+                formatMax={fmtSpendMax}
+                goalPct={spendGoalPct}
+              />
+              <GaugeCard
+                label={`Leads ${periodLabel}`}
+                value={totalLeads}
+                displayValue={totalLeads.toLocaleString()}
+                max={leadsMax}
+                color="#059669"
+                formatMin="0"
+                formatMax={fmtLeadsMax}
+                goalPct={leadsGoalPct}
+              />
+              <GaugeCard
+                label={`Enrollment ${periodLabel}`}
+                value={totalEnrollments}
+                displayValue={totalEnrollments.toLocaleString()}
+                max={enrollMax}
+                color="#D97706"
+                formatMin="0"
+                formatMax={fmtEnrollMax}
+                goalPct={enrollGoalPct}
+              />
+              <GaugeCard
+                label={`L2E% ${periodLabel}`}
+                value={gaugeL2E}
+                displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : '—'}
+                max={12}
+                color="#7C3AED"
+                formatMin="0%"
+                formatMax="12%"
+              />
             </div>
           )
         })()}
-
-        {/* Row 3: Gauges — follow active period */}
-        <div className="grid grid-cols-4 gap-4">
-          <GaugeCard
-            label={`Spend ${periodLabel}`}
-            value={totalSpend}
-            displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
-            max={250000}
-            color="#2563EB"
-            formatMin="$0"
-            formatMax="$250k"
-          />
-          <GaugeCard
-            label={`Leads ${periodLabel}`}
-            value={totalLeads}
-            displayValue={totalLeads.toLocaleString()}
-            max={6000}
-            color="#059669"
-            formatMin="0"
-            formatMax="6,000"
-          />
-          <GaugeCard
-            label={`Enrollment ${periodLabel}`}
-            value={totalEnrollments}
-            displayValue={totalEnrollments.toLocaleString()}
-            max={250}
-            color="#D97706"
-            formatMin="0"
-            formatMax="250"
-          />
-          <GaugeCard
-            label={`L2E% ${periodLabel}`}
-            value={gaugeL2E}
-            displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : '—'}
-            max={12}
-            color="#7C3AED"
-            formatMin="0%"
-            formatMax="12%"
-          />
-        </div>
 
         {/* Sales Cycle + Monthly CAC charts */}
         <div className="grid grid-cols-2 gap-4">
