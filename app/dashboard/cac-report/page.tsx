@@ -573,9 +573,16 @@ function CacReportContent({
           const leadsGoalPct  = goal?.leads_target        ? (totalLeads       / goal.leads_target)        * 100 : undefined
           const enrollGoalPct = goal?.enrollments_target  ? (totalEnrollments / goal.enrollments_target)  * 100 : undefined
 
+          // L2E% goal = (enrollments_target / leads_target) × 100
+          const l2eGoalMax = (goal?.enrollments_target && goal?.leads_target)
+            ? (goal.enrollments_target / goal.leads_target) * 100
+            : null
+          const l2eGoalPct = l2eGoalMax ? (gaugeL2E / l2eGoalMax) * 100 : undefined
+
           const fmtSpendMax   = goal?.spend_target        ? `$${Math.round(goal.spend_target / 1000)}k`      : '$250k'
           const fmtLeadsMax   = goal?.leads_target        ? goal.leads_target.toLocaleString()                : '6,000'
           const fmtEnrollMax  = goal?.enrollments_target  ? goal.enrollments_target.toLocaleString()          : '250'
+          const fmtL2EMax     = l2eGoalMax                ? `${l2eGoalMax.toFixed(1)}%`                       : '12%'
 
           return (
             <div className="grid grid-cols-4 gap-4">
@@ -613,10 +620,11 @@ function CacReportContent({
                 label={`L2E% ${periodLabel}`}
                 value={gaugeL2E}
                 displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : '—'}
-                max={12}
+                max={l2eGoalMax ?? 12}
                 color="#7C3AED"
                 formatMin="0%"
-                formatMax="12%"
+                formatMax={fmtL2EMax}
+                goalPct={l2eGoalPct}
               />
             </div>
           )
