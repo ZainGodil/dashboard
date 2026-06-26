@@ -25,6 +25,10 @@ const MONTH_MAP: Record<string, string> = {
   Jul:'07', Aug:'08', Sep:'09', Oct:'10', Nov:'11', Dec:'12',
 }
 
+function fmt$(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function monthLabelToStart(label: string): string {
   const [mon, yr] = label.split('-')
   return `20${yr}-${MONTH_MAP[mon]}-01`
@@ -205,7 +209,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     const enrollments = (monthlyCacRaw ?? [])
       .filter((r) => r.month === month)
       .reduce((s, r) => s + r.enrollments, 0)
-    return { month, cac: enrollments > 0 ? Math.round(spend / enrollments) : 0, enrollments }
+    return { month, cac: enrollments > 0 ? spend / enrollments : 0, enrollments }
   })
 
   // ── Aggregate chart data ─────────────────────────────────────────
@@ -466,7 +470,7 @@ function CacReportContent({
         .reduce((s, r) => s + r.enrollments, 0)
       const spend = trendSpendRows.filter((r) => r.date.startsWith(prefix) && r.course === course)
         .reduce((s, r) => s + Number(r.spend), 0)
-      point[course] = enroll > 0 ? Math.round(spend / enroll) : 0
+      point[course] = enroll > 0 ? spend / enroll : 0
     }
     return point
   })
@@ -506,38 +510,38 @@ function CacReportContent({
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
           <StatCard
             label="Bookings MTD"
-            value={bookingRevenueMtd > 0 ? `$${Math.round(bookingRevenueMtd).toLocaleString()}` : '—'}
+            value={bookingRevenueMtd > 0 ? `$${fmt$(bookingRevenueMtd)}` : '—'}
             accent="green"
           />
-          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : '—'} accent="teal" />
-          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
+          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${fmt$(blendedCpl)}` : '—'} accent="teal" />
+          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${fmt$(blendedCac)}` : '—'} accent="amber" />
         </div>
 
         {/* Row 2: Platform spend tiles — Total Spend first */}
         <div className="grid grid-cols-5 gap-3">
           <StatCard
             label={`Total Spend ${periodLabel}`}
-            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
+            value={(googleSpend + metaSpend) > 0 ? `$${fmt$(googleSpend + metaSpend)}` : '—'}
             accent="amber"
           />
           <StatCard
             label={`Google Spend ${periodLabel}`}
-            value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
+            value={googleSpend > 0 ? `$${fmt$(googleSpend)}` : '—'}
             accent="blue"
           />
           <StatCard
             label={`Meta Spend ${periodLabel}`}
-            value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : '—'}
+            value={metaSpend > 0 ? `$${fmt$(metaSpend)}` : '—'}
             accent="teal"
           />
           <StatCard
             label="Google CPL"
-            value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : '—'}
+            value={googleCpl > 0 ? `$${fmt$(googleCpl)}` : '—'}
             accent="blue"
           />
           <StatCard
             label="Meta CPL"
-            value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : '—'}
+            value={metaCpl > 0 ? `$${fmt$(metaCpl)}` : '—'}
             accent="teal"
           />
         </div>
@@ -547,7 +551,7 @@ function CacReportContent({
           <GaugeCard
             label={`Spend ${periodLabel}`}
             value={totalSpend}
-            displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
+            displayValue={totalSpend > 0 ? `$${(totalSpend / 1000).toFixed(1)}k` : '—'}
             max={250000}
             color="#2563EB"
             formatMin="$0"
