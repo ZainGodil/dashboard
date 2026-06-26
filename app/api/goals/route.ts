@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 async function requireSession() {
   const supabase = createClient()
@@ -11,7 +11,7 @@ export async function GET() {
   const user = await requireSession()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('goals')
     .select('*')
@@ -25,6 +25,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await requireSession()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const body = await req.json() as {
     period_type: string
     period: string
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'period_type and period are required' }, { status: 400 })
   }
 
-  const supabase = createServiceClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('goals')
     .upsert(
