@@ -251,7 +251,7 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
   }
 
   // Total colspan for "no data" cell
-  const totalCols = 1 + 3 + activeSources.length + 1 + activeEnrollSources.length + 2 + 3 + 1
+  const totalCols = 1 + 3 + activeSources.length + 1 + activeEnrollSources.length + 2 + activeSources.length + 3 + 1
 
   return (
     <div>
@@ -310,6 +310,7 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-blue-50 text-blue-600" colSpan={3}>Spend</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-teal-50 text-teal-600" colSpan={activeSources.length + 1}>Leads by Source</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-green-50 text-green-600" colSpan={activeEnrollSources.length + 2}>Conversions</th>
+                  <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-purple-50 text-purple-600" colSpan={activeSources.length}>L2E% by Source</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-amber-50 text-amber-600" colSpan={3}>CPL</th>
                   <th className="text-center px-2 py-1 font-semibold border-l border-slate-200 bg-rose-50 text-rose-600" colSpan={1}>CAC</th>
                 </tr>
@@ -330,6 +331,11 @@ function GrandSummaryContent({ period, rows }: { period: Period; rows: SummaryRo
                   ))}
                   <th className={`text-right px-3 py-2 font-semibold font-bold ${activeEnrollSources.length === 0 ? 'border-l border-slate-200' : ''}`}>Enrollments</th>
                   <th className="text-right px-3 py-2 font-semibold">L2E%</th>
+                  {activeSources.map((src, i) => (
+                    <th key={`l2e-src-${src}`} className={`text-right px-3 py-2 font-semibold whitespace-nowrap ${i === 0 ? 'border-l border-slate-200' : ''}`}>
+                      {src}
+                    </th>
+                  ))}
                   <th className="text-right px-3 py-2 font-semibold border-l border-slate-200">Google</th>
                   <th className="text-right px-3 py-2 font-semibold">Meta</th>
                   <th className="text-right px-3 py-2 font-semibold">Blended</th>
@@ -429,6 +435,16 @@ function DataRow({ row, label, activeSources, activeEnrollSources, isTotal, isGr
       ))}
       <td className={`px-3 ${py} text-right tabular-nums font-semibold ${activeEnrollSources.length === 0 ? 'border-l border-slate-200' : ''}`}>{fmtN(row.enrollments)}</td>
       <td className={`px-3 ${py} text-right tabular-nums`}>{fmtPct(m.l2e)}</td>
+      {activeSources.map((src, i) => {
+        const srcLeads = row.leadsBySource[src] ?? 0
+        const srcEnrolls = row.enrollmentsBySource[src] ?? 0
+        const srcL2e = srcLeads > 0 ? srcEnrolls / srcLeads : 0
+        return (
+          <td key={`l2e-${src}`} className={`px-3 ${py} text-right tabular-nums text-purple-700 ${i === 0 ? 'border-l border-slate-200' : ''}`}>
+            {srcLeads > 0 ? fmtPct(srcL2e) : '—'}
+          </td>
+        )
+      })}
       <td className={`px-3 ${py} text-right tabular-nums border-l border-slate-200 text-blue-700`}>{fmt$(m.gCpl)}</td>
       <td className={`px-3 ${py} text-right tabular-nums text-teal-700`}>{fmt$(m.fbCpl)}</td>
       <td className={`px-3 ${py} text-right tabular-nums`}>{fmt$(m.blendedCpl)}</td>

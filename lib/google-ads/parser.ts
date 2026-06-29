@@ -20,6 +20,7 @@ const UNIVERSITY_TOKENS: Record<string, University> = {
   'hofstra': 'Hofstra',
   'neiu': 'NEIU',
   'scu': 'SCU',
+  'utsa': 'UTSA',
 }
 
 const SEGMENT_TOKENS: Record<string, Segment> = {

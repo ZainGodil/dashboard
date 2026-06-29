@@ -10,7 +10,7 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: 'ytd', label: 'YTD' },
 ]
 
-const UNIVERSITIES = ['All Universities', 'UTA', 'WFI', 'Hofstra', 'NEIU', 'SCU']
+const UNIVERSITIES = ['All Universities', 'UTA', 'WFI', 'Hofstra', 'NEIU', 'SCU', 'UTSA']
 const SEGMENTS = ['B2C + WFD', 'B2C', 'WFD']
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 

@@ -35,6 +35,7 @@ const UNI_COLORS: Record<string, string> = {
   Hofstra: 'bg-amber-500',
   NEIU: 'bg-emerald-600',
   SCU: 'bg-orange-500',
+  UTSA: 'bg-rose-500',
 }
 
 function fmt(n: number): string { return n > 0 ? `$${n.toLocaleString()}` : '—' }
