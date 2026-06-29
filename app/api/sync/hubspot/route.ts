@@ -44,12 +44,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ synced: 0, message: 'No contacts to sync' })
     }
 
+    // Collect unrecognised university raw values for diagnostics
+    const unknownUniValues = new Map<string, number>()
+
     const rows = contacts.map((c) => {
       const p = c.properties
       const { segment, salesSegment } = mapSegment(p.hs_analytics_source_data_2)
       const enrolled = enrolledDealContactIds.has(c.id)
       const viable = mapViable(p.viable_non_viable_leads)
-      const university = mapUniversity(p.pick_university ?? p.university)
+      const rawUni = p.pick_university ?? p.university ?? null
+      const university = mapUniversity(rawUni)
+      if (rawUni && !university) unknownUniValues.set(rawUni, (unknownUniValues.get(rawUni) ?? 0) + 1)
       const course = mapCourse(p.course_validation)
       // Use Chicago time (portal timezone) so dates match HubSpot's MTD filter
       const createDate = p.createdate
@@ -159,7 +164,11 @@ export async function GET(req: NextRequest) {
     await recomputeRollingMetrics()
 
     await writeSyncLog(supabase, startedAt, recordsSynced, 'success', null)
-    return NextResponse.json({ synced: recordsSynced, months: Array.from(monthSet) })
+    return NextResponse.json({
+      synced: recordsSynced,
+      months: Array.from(monthSet),
+      unknownUniversityValues: Object.fromEntries(unknownUniValues),
+    })
 
   } catch (err) {
     const base = err instanceof Error ? err.message : String(err)
