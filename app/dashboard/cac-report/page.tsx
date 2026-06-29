@@ -186,7 +186,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
         return s + amt * multiplier
       }, 0) / enrollmentsWithAmount.length
     : 0
-  const roas = avgLtv > 0 ? aov / avgLtv : 0
+  // roas computed in CacReportContent where blendedCac is available
 
   // ── Sales cycle: avg days lead→enrollment per month ─────────────────
   const enrolledIds = (enrollmentDatesRaw ?? []).map((e) => e.hubspot_contact_id).filter(Boolean)
@@ -339,7 +339,6 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       bookingRevenueMtd={bookingRevenueMtd}
       aov={aov}
       avgLtv={avgLtv}
-      roas={roas}
       customMonth={customMonth}
       enrolledNames={enrolledNames}
       trendCacRows={trendCacRaw ?? []}
@@ -397,7 +396,6 @@ interface ContentProps {
   bookingRevenueMtd: number
   aov: number
   avgLtv: number
-  roas: number
   enrolledNames: MtdEnrolledContact[]
   trendCacRows: TrendCacRow[]
   monthlyGoal: { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
@@ -409,7 +407,7 @@ interface ContentProps {
 function CacReportContent({
   period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
-  salesCycleData, monthlyCacData, bookingRevenueMtd, aov, avgLtv, roas, enrolledNames, trendCacRows,
+  salesCycleData, monthlyCacData, bookingRevenueMtd, aov, avgLtv, enrolledNames, trendCacRows,
   monthlyGoal, yearlyGoal,
 }: ContentProps) {
   const isRolling = period === '90d'
@@ -428,6 +426,7 @@ function CacReportContent({
 
   const blendedCpl = totalLeads > 0 ? totalSpend / totalLeads : 0
   const blendedCac = totalEnrollments > 0 ? totalSpend / totalEnrollments : 0
+  const roas = blendedCac > 0 ? aov / blendedCac : 0
 
   // Per-platform spend map keyed by "course|university|platform"
   const platMap = new Map<string, number>()
