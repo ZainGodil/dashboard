@@ -9,7 +9,7 @@ const ENROLLED_STAGES = new Set([
 
 interface Deal {
   id: string
-  properties: { dealstage: string | null; closedate: string | null; amount?: string | null }
+  properties: { dealstage: string | null; closedate: string | null; amount?: string | null; payment_frequency?: string | null }
   associations?: { contacts?: { results: { id: string }[] } }
 }
 
@@ -61,9 +61,10 @@ export async function fetchMtdBookingRevenue(): Promise<number> {
 export interface EnrolledDealData {
   closedate: string | null
   amount: number
+  payment_frequency: string | null
 }
 
-// Returns Map<contactId, { closedate, amount }>
+// Returns Map<contactId, { closedate, amount, payment_frequency }>
 export async function fetchEnrolledContactIds(): Promise<Map<string, EnrolledDealData>> {
   const contactDeals = new Map<string, EnrolledDealData>()
   let after: string | undefined
@@ -71,7 +72,7 @@ export async function fetchEnrolledContactIds(): Promise<Map<string, EnrolledDea
   do {
     const params = new URLSearchParams({
       limit: '100',
-      properties: 'dealstage,closedate,amount',
+      properties: 'dealstage,closedate,amount,payment_frequency',
       associations: 'contacts',
       ...(after ? { after } : {}),
     })
@@ -82,9 +83,10 @@ export async function fetchEnrolledContactIds(): Promise<Map<string, EnrolledDea
       if (ENROLLED_STAGES.has(deal.properties.dealstage ?? '')) {
         const closedate = deal.properties.closedate ?? null
         const amount = Number(deal.properties.amount ?? 0)
+        const payment_frequency = deal.properties.payment_frequency ?? null
         const contacts = deal.associations?.contacts?.results ?? []
         for (const c of contacts) {
-          if (!contactDeals.has(c.id)) contactDeals.set(c.id, { closedate, amount })
+          if (!contactDeals.has(c.id)) contactDeals.set(c.id, { closedate, amount, payment_frequency })
         }
       }
     }

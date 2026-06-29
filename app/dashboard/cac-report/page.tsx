@@ -152,10 +152,10 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       .in('month', last12),
     // Enrollments for the active period — used for names table, gauge count, and booking revenue
     is90d
-      ? supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount')
+      ? supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount, payment_frequency')
           .gte('enrolled_at', new Date(today.getTime() - 90 * 86400000).toISOString().split('T')[0])
           .lte('enrolled_at', todayStr)
-      : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount')
+      : supabase.from('enrollments').select('hubspot_contact_id, course, university, segment, month, deal_amount, payment_frequency')
           .in('month', activeMonths),
     supabase.from('cac_metrics').select('month, course, enrollments')
       .in('month', trendMonths),
@@ -164,6 +164,26 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   // ── Booking revenue: sum deal_amount for active-period enrollments ───
   const bookingRevenueMtd = (periodEnrollmentsRaw ?? [])
     .reduce((sum, e) => sum + ((e as { deal_amount?: number | null }).deal_amount ?? 0), 0)
+
+  // ── AOV / LTV / ROAS ─────────────────────────────────────────────────
+  // AOV  = average deal_amount across enrollments with a booking amount
+  // LTV  = One Time → 100% of deal_amount; Monthly Plan or Credee → 50%
+  // ROAS = AOV / LTV
+  const enrollmentsWithAmount = (periodEnrollmentsRaw ?? []).filter(
+    (e) => ((e as { deal_amount?: number | null }).deal_amount ?? 0) > 0
+  )
+  const aov = enrollmentsWithAmount.length > 0
+    ? enrollmentsWithAmount.reduce((s, e) => s + ((e as { deal_amount?: number | null }).deal_amount ?? 0), 0) / enrollmentsWithAmount.length
+    : 0
+  const avgLtv = enrollmentsWithAmount.length > 0
+    ? enrollmentsWithAmount.reduce((s, e) => {
+        const amt = (e as { deal_amount?: number | null }).deal_amount ?? 0
+        const freq = (e as { payment_frequency?: string | null }).payment_frequency ?? ''
+        const multiplier = (freq === 'Monthly Plan' || freq === 'Credee') ? 0.5 : 1.0
+        return s + amt * multiplier
+      }, 0) / enrollmentsWithAmount.length
+    : 0
+  const roas = avgLtv > 0 ? aov / avgLtv : 0
 
   // ── Sales cycle: avg days lead→enrollment per month ─────────────────
   const enrolledIds = (enrollmentDatesRaw ?? []).map((e) => e.hubspot_contact_id).filter(Boolean)
@@ -314,6 +334,9 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       salesCycleData={salesCycleData}
       monthlyCacData={monthlyCacData}
       bookingRevenueMtd={bookingRevenueMtd}
+      aov={aov}
+      avgLtv={avgLtv}
+      roas={roas}
       customMonth={customMonth}
       enrolledNames={enrolledNames}
       trendCacRows={trendCacRaw ?? []}
@@ -369,6 +392,9 @@ interface ContentProps {
   salesCycleData: { month: string; days: number }[]
   monthlyCacData: { month: string; cac: number; enrollments: number }[]
   bookingRevenueMtd: number
+  aov: number
+  avgLtv: number
+  roas: number
   enrolledNames: MtdEnrolledContact[]
   trendCacRows: TrendCacRow[]
   monthlyGoal: { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
@@ -380,7 +406,7 @@ interface ContentProps {
 function CacReportContent({
   period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
-  salesCycleData, monthlyCacData, bookingRevenueMtd, enrolledNames, trendCacRows,
+  salesCycleData, monthlyCacData, bookingRevenueMtd, aov, avgLtv, roas, enrolledNames, trendCacRows,
   monthlyGoal, yearlyGoal,
 }: ContentProps) {
   const isRolling = period === '90d'
@@ -520,8 +546,8 @@ function CacReportContent({
       </header>
 
       <div className="p-6 space-y-4">
-        {/* Row 1: Summary stat cards — 5 cols */}
-        <div className="grid grid-cols-5 gap-3">
+        {/* Row 1: Summary stat cards */}
+        <div className="grid grid-cols-4 gap-3">
           <StatCard label={`Total Leads ${periodLabel}`} value={totalLeads.toLocaleString()} accent="blue" />
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
           <StatCard
@@ -530,7 +556,24 @@ function CacReportContent({
             accent="green"
           />
           <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : ''} accent="teal" />
+        </div>
+        <div className="grid grid-cols-4 gap-3">
           <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : ''} accent="amber" />
+          <StatCard
+            label="AOV (Avg Booking)"
+            value={aov > 0 ? `$${Math.round(aov).toLocaleString()}` : ''}
+            accent="teal"
+          />
+          <StatCard
+            label="LTV (Avg)"
+            value={avgLtv > 0 ? `$${Math.round(avgLtv).toLocaleString()}` : ''}
+            accent="green"
+          />
+          <StatCard
+            label="ROAS"
+            value={roas > 0 ? roas.toFixed(2) : ''}
+            accent="amber"
+          />
         </div>
 
         {/* Row 2: Platform spend tiles — Total Spend first */}

@@ -121,6 +121,7 @@ export async function GET(req: NextRequest) {
           enrolled_at: enrolledAt,
           month: enrolledAt ? formatMonth(enrolledAt) : null,
           deal_amount: dealData?.amount ?? null,
+          payment_frequency: dealData?.payment_frequency ?? null,
         }
       })
 
