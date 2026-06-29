@@ -178,8 +178,8 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const avgLtv = enrollmentsWithAmount.length > 0
     ? enrollmentsWithAmount.reduce((s, e) => {
         const amt = (e as { deal_amount?: number | null }).deal_amount ?? 0
-        const freq = (e as { payment_frequency?: string | null }).payment_frequency ?? ''
-        const multiplier = (freq === 'Monthly Plan' || freq === 'Credee') ? 0.5 : 1.0
+        const freq = ((e as { payment_frequency?: string | null }).payment_frequency ?? '').toLowerCase()
+        const multiplier = (freq.includes('monthly') || freq.includes('credee')) ? 0.5 : 1.0
         return s + amt * multiplier
       }, 0) / enrollmentsWithAmount.length
     : 0
@@ -560,12 +560,12 @@ function CacReportContent({
         <div className="grid grid-cols-4 gap-3">
           <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : ''} accent="amber" />
           <StatCard
-            label="AOV (Avg Booking)"
+            label="AOV"
             value={aov > 0 ? `$${Math.round(aov).toLocaleString()}` : ''}
             accent="teal"
           />
           <StatCard
-            label="LTV (Avg)"
+            label="LTV"
             value={avgLtv > 0 ? `$${Math.round(avgLtv).toLocaleString()}` : ''}
             accent="green"
           />
