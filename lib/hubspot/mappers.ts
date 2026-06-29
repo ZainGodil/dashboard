@@ -14,6 +14,9 @@ const UNIVERSITY_MAP: Record<string, University> = {
   'santa clara': 'SCU',
   'utsa': 'UTSA',
   'university of texas at san antonio': 'UTSA',
+  'ut san antonio': 'UTSA',
+  'utsa - university of texas at san antonio': 'UTSA',
+  'university of texas san antonio': 'UTSA',
 }
 
 export function mapUniversity(raw: string | null | undefined): University | null {
