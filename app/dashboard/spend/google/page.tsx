@@ -106,10 +106,10 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
 
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-4 gap-3">
-          <StatCard label={`Total Spend ${periodLabel}`} value={totalSpend > 0 ? `$${Math.round(totalSpend).toLocaleString()}` : '—'} accent="blue" />
+          <StatCard label={`Total Spend ${periodLabel}`} value={totalSpend > 0 ? `$${Math.round(totalSpend).toLocaleString()}` : ''} accent="blue" />
           <StatCard label="Active Campaigns" value={uniqueCampaigns.toLocaleString()} accent="teal" />
           <StatCard label="Impressions" value={totalImpressions.toLocaleString()} accent="green" />
-          <StatCard label="Avg CPC" value={avgCpc > 0 ? `$${avgCpc.toFixed(2)}` : '—'} accent="amber" />
+          <StatCard label="Avg CPC" value={avgCpc > 0 ? `$${avgCpc.toFixed(2)}` : ''} accent="amber" />
         </div>
 
         {/* Spend by Campus × Program */}
@@ -137,11 +137,11 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
                     <td className="px-4 py-2.5 text-slate-600">{r.course}</td>
                     <td className="px-4 py-2.5 text-right text-slate-800 font-semibold tabular-nums">${Math.round(r.spend).toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
-                      {totalSpend > 0 ? `${((r.spend / totalSpend) * 100).toFixed(1)}%` : '—'}
+                      {totalSpend > 0 ? `${((r.spend / totalSpend) * 100).toFixed(1)}%` : ''}
                     </td>
                     <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.impressions.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.clicks.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.cpc > 0 ? `$${r.cpc.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.cpc > 0 ? `$${r.cpc.toFixed(2)}` : ''}</td>
                   </tr>
                 ))}
                 {tableRows.length === 0 && (
@@ -156,7 +156,7 @@ export default async function GoogleSpendPage({ searchParams }: PageProps) {
                     <td className="px-4 py-2.5 text-right">100%</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{totalImpressions.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{totalClicks.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{avgCpc > 0 ? `$${avgCpc.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{avgCpc > 0 ? `$${avgCpc.toFixed(2)}` : ''}</td>
                   </tr>
                 </tfoot>
               )}

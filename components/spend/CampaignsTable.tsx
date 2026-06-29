@@ -129,7 +129,7 @@ export default function CampaignsTable({ campaigns: initial, totalSpend, platfor
                 ${Math.round(c.spend).toLocaleString()}
               </td>
               <td className="px-4 py-2 text-right text-slate-500 tabular-nums">
-                {totalSpend > 0 ? `${((c.spend / totalSpend) * 100).toFixed(1)}%` : '—'}
+                {totalSpend > 0 ? `${((c.spend / totalSpend) * 100).toFixed(1)}%` : ''}
               </td>
             </tr>
           ))}

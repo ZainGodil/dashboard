@@ -46,7 +46,7 @@ function getCount(counts: Record<string, number>, key: string): number {
 }
 
 function pctStr(n: number, viable: number): string {
-  return viable > 0 ? `${Math.round(n / viable * 100)}%` : '—'
+  return viable > 0 ? `${Math.round(n / viable * 100)}%` : ''
 }
 
 // Pre-flag first row of each group to avoid mutation in render

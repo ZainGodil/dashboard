@@ -18,11 +18,11 @@ const RAG_PILL_STYLE = {
 }
 
 function fmt(n: number): string {
-  return n === 0 ? '—' : `$${n.toLocaleString()}`
+  return n === 0 ? '' : `$${n.toLocaleString()}`
 }
 
 function pct(n: number): string {
-  return n === 0 ? '—' : `${(n * 100).toFixed(1)}%`
+  return n === 0 ? '' : `${(n * 100).toFixed(1)}%`
 }
 
 export default function SbuCard({ course, leads, enrollments, cvr, cpl, cac, ragStatus }: SbuCardProps) {

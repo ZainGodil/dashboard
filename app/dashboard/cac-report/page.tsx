@@ -526,38 +526,38 @@ function CacReportContent({
           <StatCard label={`Enrollments ${periodLabel}`} value={totalEnrollments.toLocaleString()} accent="green" />
           <StatCard
             label="Bookings MTD"
-            value={bookingRevenueMtd > 0 ? `$${Math.round(bookingRevenueMtd).toLocaleString()}` : '—'}
+            value={bookingRevenueMtd > 0 ? `$${Math.round(bookingRevenueMtd).toLocaleString()}` : ''}
             accent="green"
           />
-          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : '—'} accent="teal" />
-          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : '—'} accent="amber" />
+          <StatCard label="Blended CPL" value={blendedCpl > 0 ? `$${Math.round(blendedCpl).toLocaleString()}` : ''} accent="teal" />
+          <StatCard label="Blended CAC" value={blendedCac > 0 ? `$${Math.round(blendedCac).toLocaleString()}` : ''} accent="amber" />
         </div>
 
         {/* Row 2: Platform spend tiles — Total Spend first */}
         <div className="grid grid-cols-5 gap-3">
           <StatCard
             label={`Total Spend ${periodLabel}`}
-            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : '—'}
+            value={(googleSpend + metaSpend) > 0 ? `$${Math.round(googleSpend + metaSpend).toLocaleString()}` : ''}
             accent="amber"
           />
           <StatCard
             label={`Google Spend ${periodLabel}`}
-            value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : '—'}
+            value={googleSpend > 0 ? `$${Math.round(googleSpend).toLocaleString()}` : ''}
             accent="blue"
           />
           <StatCard
             label={`Meta Spend ${periodLabel}`}
-            value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : '—'}
+            value={metaSpend > 0 ? `$${Math.round(metaSpend).toLocaleString()}` : ''}
             accent="teal"
           />
           <StatCard
             label="Google CPL"
-            value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : '—'}
+            value={googleCpl > 0 ? `$${Math.round(googleCpl).toLocaleString()}` : ''}
             accent="blue"
           />
           <StatCard
             label="Meta CPL"
-            value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : '—'}
+            value={metaCpl > 0 ? `$${Math.round(metaCpl).toLocaleString()}` : ''}
             accent="teal"
           />
         </div>
@@ -589,7 +589,7 @@ function CacReportContent({
               <GaugeCard
                 label={`Spend ${periodLabel}`}
                 value={totalSpend}
-                displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : '—'}
+                displayValue={totalSpend > 0 ? `$${Math.round(totalSpend / 1000)}k` : ''}
                 max={spendMax}
                 color="#2563EB"
                 formatMin="$0"
@@ -619,7 +619,7 @@ function CacReportContent({
               <GaugeCard
                 label={`L2E% ${periodLabel}`}
                 value={gaugeL2E}
-                displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : '—'}
+                displayValue={gaugeL2E > 0 ? `${gaugeL2E.toFixed(2)}%` : ''}
                 max={l2eGoalMax ?? 12}
                 color="#7C3AED"
                 formatMin="0%"
@@ -722,11 +722,11 @@ function CacReportContent({
                     <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                       <td className="px-5 py-2.5 text-slate-400 tabular-nums">{i + 1}</td>
                       <td className="px-5 py-2.5 font-medium text-slate-900">
-                        {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
+                        {[c.first_name, c.last_name].filter(Boolean).join(' ')}
                       </td>
-                      <td className="px-5 py-2.5 text-slate-600">{c.course ?? '—'}</td>
-                      <td className="px-5 py-2.5 text-slate-600">{c.university ?? '—'}</td>
-                      <td className="px-5 py-2.5 text-slate-600">{c.advisor ?? '—'}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.course ?? ''}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.university ?? ''}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.advisor ?? ''}</td>
                       <td className="px-5 py-2.5">
                         {c.segment ? (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
@@ -734,12 +734,12 @@ function CacReportContent({
                           }`}>
                             {c.segment}
                           </span>
-                        ) : '—'}
+                        ) : ''}
                       </td>
                       <td className="px-5 py-2.5 text-right tabular-nums text-slate-700 font-medium">
                         {c.deal_amount != null && c.deal_amount > 0
                           ? `$${c.deal_amount.toLocaleString()}`
-                          : '—'}
+                          : ''}
                       </td>
                     </tr>
                   ))}

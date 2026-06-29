@@ -20,7 +20,7 @@ export default function BookingsTrendChart({ data }: { data: MonthPoint[] }) {
         <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">
           YTD Bookings Trend
         </div>
-        <div className="text-[11px] text-slate-400 mb-3">Monthly B2HE vs B2G</div>
+        <div className="text-[11px] text-slate-400 mb-3">Monthly B2C vs WFD</div>
         <div className="h-[180px] flex items-center justify-center text-slate-300 text-sm">No data yet</div>
       </div>
     )
@@ -31,7 +31,7 @@ export default function BookingsTrendChart({ data }: { data: MonthPoint[] }) {
       <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">
         YTD Bookings Trend
       </div>
-      <div className="text-[11px] text-slate-400 mb-3">Monthly B2HE vs B2G</div>
+      <div className="text-[11px] text-slate-400 mb-3">Monthly B2C vs WFD</div>
       <ResponsiveContainer width="100%" height={180}>
         <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -44,13 +44,13 @@ export default function BookingsTrendChart({ data }: { data: MonthPoint[] }) {
           />
           <Tooltip
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0' }}
-            formatter={(v, name) => [v, name === 'b2he' ? 'B2HE' : 'B2G']}
+            formatter={(v, name) => [v, name === 'b2he' ? 'B2C' : 'WFD']}
           />
           <Legend
             iconType="circle"
             iconSize={8}
             wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-            formatter={(val) => (val === 'b2he' ? 'B2HE' : 'B2G')}
+            formatter={(val) => (val === 'b2he' ? 'B2C' : 'WFD')}
           />
           <Line
             type="monotone"

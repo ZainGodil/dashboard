@@ -260,8 +260,8 @@ export default async function SalesKpisPage({
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Bookings" value={totalBookings} sub={periodLabel} />
-        <KpiCard label="B2HE"           value={totalB2HE}     sub={`${periodLabel} enrollments`} accent="blue" />
-        <KpiCard label="B2G"            value={totalB2G}      sub={`${periodLabel} enrollments`} accent="purple" />
+        <KpiCard label="B2C"            value={totalB2HE}     sub={`${periodLabel} enrollments`} accent="blue" />
+        <KpiCard label="WFD"            value={totalB2G}      sub={`${periodLabel} enrollments`} accent="purple" />
         <KpiCard label="Pipeline"       value={totalPipeline} sub="Decision stage" accent={totalPipeline > 0 ? 'amber' : 'slate'} />
       </div>
 
@@ -272,8 +272,8 @@ export default async function SalesKpisPage({
             vs Target — {periodLabel}
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-2">
-            {b2heTarget > 0 && <GoalBar label="B2HE" actual={totalB2HE} target={b2heTarget} />}
-            {b2gTarget  > 0 && <GoalBar label="B2G"  actual={totalB2G}  target={b2gTarget}  />}
+            {b2heTarget > 0 && <GoalBar label="B2C" actual={totalB2HE} target={b2heTarget} />}
+            {b2gTarget  > 0 && <GoalBar label="WFD"  actual={totalB2G}  target={b2gTarget}  />}
             {hasGoals         && <GoalBar label="All"  actual={totalBookings} target={totalTarget} />}
           </div>
         </div>
@@ -288,7 +288,7 @@ export default async function SalesKpisPage({
           {advisorRows.length > 0 && (
             <CsvButton
               filename={csvFilename}
-              headers={['Advisor', 'B2HE', 'B2G', 'Total', 'Pipeline']}
+              headers={['Advisor', 'B2C', 'WFD', 'Total', 'Pipeline']}
               rows={csvRows}
             />
           )}
@@ -301,10 +301,10 @@ export default async function SalesKpisPage({
                   Advisor
                 </th>
                 <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-[0.7px] text-blue-400 font-semibold">
-                  B2HE
+                  B2C
                 </th>
                 <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-[0.7px] text-purple-400 font-semibold">
-                  B2G
+                  WFD
                 </th>
                 <th className="text-right px-3 py-2.5 text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold">
                   Total
@@ -352,16 +352,16 @@ export default async function SalesKpisPage({
                 <tr className="bg-slate-50 border-t-2 border-slate-200">
                   <td className="px-4 py-2.5 text-[11px] font-bold text-slate-900">Total</td>
                   <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-600">
-                    {totalB2HE > 0 ? totalB2HE : '—'}
+                    {totalB2HE > 0 ? totalB2HE : ''}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono font-bold text-purple-600">
-                    {totalB2G > 0 ? totalB2G : '—'}
+                    {totalB2G > 0 ? totalB2G : ''}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
-                    {totalBookings > 0 ? totalBookings : '—'}
+                    {totalBookings > 0 ? totalBookings : ''}
                   </td>
                   <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-600">
-                    {totalPipeline > 0 ? totalPipeline : '—'}
+                    {totalPipeline > 0 ? totalPipeline : ''}
                   </td>
                 </tr>
               </tfoot>
@@ -376,7 +376,7 @@ export default async function SalesKpisPage({
           <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">
             Bookings by Advisor
           </div>
-          <div className="text-[11px] text-slate-400 mb-3">{periodLabel} — B2HE + B2G</div>
+          <div className="text-[11px] text-slate-400 mb-3">{periodLabel} — B2C + WFD</div>
           <BookingsChart data={chartData} />
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">

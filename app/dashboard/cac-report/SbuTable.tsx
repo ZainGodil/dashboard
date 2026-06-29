@@ -38,8 +38,8 @@ const UNI_COLORS: Record<string, string> = {
   UTSA: 'bg-rose-500',
 }
 
-function fmt(n: number): string { return n > 0 ? `$${n.toLocaleString()}` : '—' }
-function pct(n: number): string { return n > 0 ? `${(n * 100).toFixed(1)}%` : '—' }
+function fmt(n: number): string { return n > 0 ? `$${n.toLocaleString()}` : '' }
+function pct(n: number): string { return n > 0 ? `${(n * 100).toFixed(1)}%` : '' }
 
 export default function SbuTable({ rows }: SbuTableProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -94,7 +94,7 @@ export default function SbuTable({ rows }: SbuTableProps) {
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">{fmt(row.cpl)}</td>
-                <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">—</td>
+                <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900"></td>
                 <td className="px-4 py-2.5 text-right font-mono font-semibold text-blue-600">{fmt(row.cac)}</td>
               </tr>
 
@@ -120,12 +120,12 @@ export default function SbuTable({ rows }: SbuTableProps) {
                   <td className="px-4 py-2 text-right font-mono text-slate-600">
                     {uni.cplGoogle > 0 ? (
                       <span className="inline-block text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">{fmt(uni.cplGoogle)}</span>
-                    ) : '—'}
+                    ) : ''}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-slate-600">
                     {uni.cplMeta > 0 ? (
                       <span className="inline-block text-[10px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded font-mono">{fmt(uni.cplMeta)}</span>
-                    ) : '—'}
+                    ) : ''}
                   </td>
                   <td className="px-4 py-2 text-right font-mono text-blue-600">{fmt(uni.cac)}</td>
                 </tr>

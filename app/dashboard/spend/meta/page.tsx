@@ -106,10 +106,10 @@ export default async function MetaSpendPage({ searchParams }: PageProps) {
 
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-4 gap-3">
-          <StatCard label={`Total Spend ${periodLabel}`} value={totalSpend > 0 ? `$${Math.round(totalSpend).toLocaleString()}` : '—'} accent="teal" />
+          <StatCard label={`Total Spend ${periodLabel}`} value={totalSpend > 0 ? `$${Math.round(totalSpend).toLocaleString()}` : ''} accent="teal" />
           <StatCard label="Active Campaigns" value={uniqueCampaigns.toLocaleString()} accent="blue" />
           <StatCard label="Impressions" value={totalImpressions.toLocaleString()} accent="green" />
-          <StatCard label="Avg CPM" value={avgCpm > 0 ? `$${avgCpm.toFixed(2)}` : '—'} accent="amber" />
+          <StatCard label="Avg CPM" value={avgCpm > 0 ? `$${avgCpm.toFixed(2)}` : ''} accent="amber" />
         </div>
 
         {/* Spend by Campus × Program */}
@@ -137,11 +137,11 @@ export default async function MetaSpendPage({ searchParams }: PageProps) {
                     <td className="px-4 py-2.5 text-slate-600">{r.course}</td>
                     <td className="px-4 py-2.5 text-right text-slate-800 font-semibold tabular-nums">${Math.round(r.spend).toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
-                      {totalSpend > 0 ? `${((r.spend / totalSpend) * 100).toFixed(1)}%` : '—'}
+                      {totalSpend > 0 ? `${((r.spend / totalSpend) * 100).toFixed(1)}%` : ''}
                     </td>
                     <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.impressions.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.clicks.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.cpm > 0 ? `$${r.cpm.toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{r.cpm > 0 ? `$${r.cpm.toFixed(2)}` : ''}</td>
                   </tr>
                 ))}
                 {tableRows.length === 0 && (
@@ -157,7 +157,7 @@ export default async function MetaSpendPage({ searchParams }: PageProps) {
                     <td className="px-4 py-2.5 text-right tabular-nums">{totalImpressions.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{totalClicks.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {totalImpressions > 0 ? `$${((totalSpend / totalImpressions) * 1000).toFixed(2)}` : '—'}
+                      {totalImpressions > 0 ? `$${((totalSpend / totalImpressions) * 1000).toFixed(2)}` : ''}
                     </td>
                   </tr>
                 </tfoot>

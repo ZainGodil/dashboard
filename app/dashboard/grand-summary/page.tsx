@@ -56,9 +56,9 @@ interface SummaryRow {
   enrollments: number
 }
 
-function fmt$(n: number): string { return n > 0 ? `$${Math.round(n).toLocaleString()}` : '—' }
-function fmtN(n: number): string { return n > 0 ? n.toLocaleString() : '—' }
-function fmtPct(n: number): string { return n > 0 ? `${(n * 100).toFixed(1)}%` : '—' }
+function fmt$(n: number): string { return n > 0 ? `$${Math.round(n).toLocaleString()}` : '' }
+function fmtN(n: number): string { return n > 0 ? n.toLocaleString() : '' }
+function fmtPct(n: number): string { return n > 0 ? `${(n * 100).toFixed(1)}%` : '' }
 
 export default async function GrandSummaryPage({ searchParams }: PageProps) {
   const period = (searchParams.period ?? 'mtd') as Period
@@ -441,7 +441,7 @@ function DataRow({ row, label, activeSources, activeEnrollSources, isTotal, isGr
         const srcL2e = srcLeads > 0 ? srcEnrolls / srcLeads : 0
         return (
           <td key={`l2e-${src}`} className={`px-3 ${py} text-right tabular-nums text-purple-700 ${i === 0 ? 'border-l border-slate-200' : ''}`}>
-            {srcLeads > 0 ? fmtPct(srcL2e) : '—'}
+            {srcLeads > 0 ? fmtPct(srcL2e) : ''}
           </td>
         )
       })}

@@ -138,7 +138,7 @@ export default async function PacingPage() {
 
   const RAG_BG = { green: 'bg-emerald-50 border-emerald-200', amber: 'bg-amber-50 border-amber-200', red: 'bg-red-50 border-red-200', none: 'bg-white border-slate-200' }
   const RAG_BADGE = { green: 'bg-emerald-100 text-emerald-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', none: 'bg-slate-100 text-slate-500' }
-  const RAG_LABEL = { green: 'On Track', amber: 'At Risk', red: 'Behind', none: '—' }
+  const RAG_LABEL = { green: 'On Track', amber: 'At Risk', red: 'Behind', none: '' }
 
   return (
     <div>
@@ -243,25 +243,25 @@ export default async function PacingPage() {
                     <tr key={row.course} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-4 py-2.5 font-medium text-slate-800">{row.course}</td>
                       <td className={`px-4 py-2.5 text-right font-mono font-semibold ${RAG_TEXT[row.enrollRag]}`}>{row.enrolled}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-slate-500">{row.enrollTarget > 0 ? row.enrollTarget : '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-500">{row.enrollTarget > 0 ? row.enrollTarget : ''}</td>
                       <td className="px-4 py-2.5 text-right font-mono text-slate-600">{(row.enrolled / daysElapsed).toFixed(1)}/day</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-slate-700">{projEom > 0 ? projEom : '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-700">{projEom > 0 ? projEom : ''}</td>
                       <td className="px-4 py-2.5 text-right font-mono text-slate-500">{daysLeft}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-slate-600">{needed !== null ? needed : '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-slate-600">{needed !== null ? needed : ''}</td>
                     </tr>
                   )
                 })}
                 <tr className="bg-slate-50 border-t-2 border-slate-200">
                   <td className="px-4 py-2.5 font-bold text-slate-900 text-[11px]">Total</td>
                   <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900">{totalEnrolled}</td>
-                  <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-700">{totalEnrollTarget > 0 ? totalEnrollTarget : '—'}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-700">{totalEnrollTarget > 0 ? totalEnrollTarget : ''}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-slate-600">{(totalEnrolled / daysElapsed).toFixed(1)}/day</td>
                   <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">
-                    {daysElapsed > 0 && totalEnrolled > 0 ? Math.round(totalEnrolled * daysInMonth / daysElapsed) : '—'}
+                    {daysElapsed > 0 && totalEnrolled > 0 ? Math.round(totalEnrolled * daysInMonth / daysElapsed) : ''}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-slate-500">{daysLeft}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-slate-600">
-                    {totalEnrollTarget > 0 && daysLeft > 0 ? Math.max(0, Math.ceil((totalEnrollTarget - totalEnrolled) / daysLeft)) : '—'}
+                    {totalEnrollTarget > 0 && daysLeft > 0 ? Math.max(0, Math.ceil((totalEnrollTarget - totalEnrolled) / daysLeft)) : ''}
                   </td>
                 </tr>
               </tbody>

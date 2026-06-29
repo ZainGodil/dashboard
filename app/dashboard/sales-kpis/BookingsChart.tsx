@@ -43,13 +43,13 @@ export default function BookingsChart({ data }: { data: AdvisorBar[] }) {
         />
         <Tooltip
           contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0' }}
-          formatter={(v, name) => [v, name === 'b2he' ? 'B2HE' : 'B2G']}
+          formatter={(v, name) => [v, name === 'b2he' ? 'B2C' : 'WFD']}
         />
         <Legend
           iconType="circle"
           iconSize={8}
           wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-          formatter={(val) => (val === 'b2he' ? 'B2HE' : 'B2G')}
+          formatter={(val) => (val === 'b2he' ? 'B2C' : 'WFD')}
         />
         <Bar dataKey="b2he" name="b2he" fill="#2563EB" stackId="a" />
         <Bar dataKey="b2g" name="b2g" fill="#7C3AED" stackId="a" radius={[0, 2, 2, 0]} />

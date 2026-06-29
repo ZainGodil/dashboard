@@ -120,7 +120,7 @@ export default function BySourceTabs({ sourceFunnels }: { sourceFunnels: SourceF
                 const val = total[col.key] as number
                 return (
                   <td key={col.key} className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900">
-                    {val > 0 ? val.toLocaleString() : '—'}
+                    {val > 0 ? val.toLocaleString() : ''}
                   </td>
                 )
               })}
