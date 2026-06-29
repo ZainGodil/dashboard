@@ -179,7 +179,10 @@ export default async function CacReportPage({ searchParams }: PageProps) {
     ? enrollmentsWithAmount.reduce((s, e) => {
         const amt = (e as { deal_amount?: number | null }).deal_amount ?? 0
         const freq = ((e as { payment_frequency?: string | null }).payment_frequency ?? '').toLowerCase()
-        const multiplier = (freq.includes('monthly') || freq.includes('credee')) ? 0.5 : 1.0
+        const isPartial = freq.includes('monthly') || freq.includes('bi-weekly') || freq.includes('biweekly') ||
+          freq.includes('weekly') || freq.includes('wioa') || freq.includes('sallie') ||
+          freq.includes('credee') || freq.includes('creede')
+        const multiplier = isPartial ? 0.5 : 1.0
         return s + amt * multiplier
       }, 0) / enrollmentsWithAmount.length
     : 0
