@@ -167,7 +167,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
 
   // ── AOV / LTV / ROAS ─────────────────────────────────────────────────
   // AOV  = average deal_amount across enrollments with a booking amount
-  // LTV  = One Time / WIOA → 100% of deal_amount; Monthly Plan / Credee / Sallie Mae → 50%
+  // LTV  = One Time / WIOA / Sallie Mae → 100%; Monthly / Weekly / Creede → 50%
   // ROAS = AOV / LTV
   const enrollmentsWithAmount = (periodEnrollmentsRaw ?? []).filter(
     (e) => ((e as { deal_amount?: number | null }).deal_amount ?? 0) > 0
@@ -180,7 +180,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
         const amt = (e as { deal_amount?: number | null }).deal_amount ?? 0
         const freq = ((e as { payment_frequency?: string | null }).payment_frequency ?? '').toLowerCase()
         const isPartial = freq.includes('monthly') || freq.includes('bi-weekly') || freq.includes('biweekly') ||
-          freq.includes('weekly') || freq.includes('sallie') ||
+          freq.includes('weekly') ||
           freq.includes('credee') || freq.includes('creede')
         const multiplier = isPartial ? 0.5 : 1.0
         return s + amt * multiplier
