@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       const rawUni = p.pick_university ?? p.university ?? null
       const university = mapUniversity(rawUni)
       if (rawUni && !university) unknownUniValues.set(rawUni, (unknownUniValues.get(rawUni) ?? 0) + 1)
-      const course = mapCourse(p.course_validation)
+      const course = mapCourse(p.course_validation ?? p.program)
       // Use Chicago time (portal timezone) so dates match HubSpot's MTD filter
       const createDate = p.createdate
         ? new Date(Number(p.createdate)).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
