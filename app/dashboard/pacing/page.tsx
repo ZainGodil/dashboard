@@ -4,7 +4,7 @@ import { fetchGoals, goalsForMonth } from '@/lib/hubspot/goals'
 import DailyLeadsChart from './DailyLeadsChart'
 import MonthlyTrendChart from './MonthlyTrendChart'
 
-const COURSES = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'General'] as const
+const COURSES = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'Project Management', 'General'] as const
 
 function formatMonth(date: Date): string {
   const LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']

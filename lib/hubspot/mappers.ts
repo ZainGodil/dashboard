@@ -30,6 +30,7 @@ export function mapCourse(courseValidation: string | null | undefined): Course {
     'Generative AI Data Analyst': 'Generative AI Data Analyst',
     'Digital Marketing': 'Digital Marketing',
     'UX/UI': 'UI/UX Design',
+    'Project Management': 'Project Management',
     'AI for Software Engineers': 'General',
   }
   return COURSE_MAP[courseValidation] ?? 'General'

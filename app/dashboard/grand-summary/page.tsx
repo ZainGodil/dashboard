@@ -28,7 +28,7 @@ function getDateRange90d(): { startDate: string; endDate: string } {
 }
 
 const PERIOD_LABELS: Record<Period, string> = { mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }
-const PROGRAMS = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'General']
+const PROGRAMS = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'Project Management', 'General']
 
 // Canonical source order — matches the Excel sheet column order
 const ALL_SOURCES = [
