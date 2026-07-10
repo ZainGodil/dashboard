@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchAllContacts } from '@/lib/hubspot/contacts'
-import { fetchEnrolledContactIds } from '@/lib/hubspot/deals'
+import { fetchEnrolledContactIds, fetchDealStageLabelMap, fetchAllDeals } from '@/lib/hubspot/deals'
 import { fetchOwnerMap } from '@/lib/hubspot/owners'
 import { mapUniversity, mapCourse, mapSegment, mapViable, mapSource, formatMonth } from '@/lib/hubspot/mappers'
 import { recomputeCacMetrics, recomputeRollingMetrics } from '@/lib/metrics/compute-cac'
@@ -35,6 +35,10 @@ export async function GET(req: NextRequest) {
     const ownerMap = await fetchOwnerMap()
     step = 'deals'
     const enrolledDealContactIds = await fetchEnrolledContactIds()
+    step = 'deal-stages'
+    const stageLabelMap = await fetchDealStageLabelMap()
+    step = 'all-deals'
+    const allDeals = await fetchAllDeals(ownerMap, stageLabelMap)
     step = 'contacts'
     // Fetch all members of HubSpot list 5711 (maintained in HubSpot UI)
     const contacts = await fetchAllContacts()
@@ -147,6 +151,34 @@ export async function GET(req: NextRequest) {
         await supabase
           .from('enrollments')
           .upsert(enrollmentUpserts, { onConflict: 'hubspot_contact_id' })
+      }
+    }
+
+    step = 'deals-upsert'
+    const dealRows = allDeals.map((d) => {
+      const closeDate = d.close_date_raw
+        ? new Date(d.close_date_raw).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
+        : null
+      return {
+        hubspot_deal_id: d.hubspot_deal_id,
+        contact_hubspot_id: d.contact_hubspot_id,
+        advisor: d.advisor,
+        stage_label: d.stage_label,
+        amount: d.amount,
+        payment_frequency: d.payment_frequency,
+        close_date: closeDate,
+        month: closeDate ? formatMonth(closeDate) : null,
+        synced_at: new Date().toISOString(),
+      }
+    })
+
+    if (dealRows.length) {
+      const DEAL_BATCH = 500
+      for (let i = 0; i < dealRows.length; i += DEAL_BATCH) {
+        const { error } = await supabase
+          .from('deals')
+          .upsert(dealRows.slice(i, i + DEAL_BATCH), { onConflict: 'hubspot_deal_id' })
+        if (error) throw new Error(`Deals upsert error: ${error.message}`)
       }
     }
 
