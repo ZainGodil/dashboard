@@ -7,6 +7,7 @@ import { sortMonthLabelsDesc } from '@/lib/metrics/periods'
 import {
   computeStageCounts,
   computeStagePercents,
+  normalizeStatus,
   sumStageCounts,
   type StageCounts,
   type StagePercents,
@@ -71,7 +72,10 @@ export default async function FunnelPage({ searchParams }: { searchParams: { m?:
   const allDeals = (deals ?? []) as DealRow[]
 
   const advisorNames = Array.from(
-    new Set(allContacts.map((c) => c.advisor).filter((a): a is string => !!a && a !== 'Unassigned'))
+    new Set([
+      ...allContacts.map((c) => c.advisor),
+      ...allDeals.map((d) => d.advisor),
+    ].filter((a): a is string => !!a && a !== 'Unassigned'))
   ).sort()
 
   const advisors: AdvisorFunnelRow[] = advisorNames.map((advisor) => {
@@ -106,8 +110,8 @@ export default async function FunnelPage({ searchParams }: { searchParams: { m?:
   })
 
   // ── Summary stat cards (selected month) ────────────────────────────
-  const totalConnected = allContacts.filter((c) => c.lead_status === 'Connected').length
-  const totalApptBooked = allContacts.filter((c) => c.lead_status === 'Career Consultation Booked').length
+  const totalConnected = allContacts.filter((c) => normalizeStatus(c.lead_status) === 'CONNECTED').length
+  const totalApptBooked = allContacts.filter((c) => normalizeStatus(c.lead_status) === 'CAREER CONSULTATION BOOKED').length
 
   const segB2c = allContacts.filter((c) => c.viable && c.segment === 'B2C').length
   const segWfd = allContacts.filter((c) => c.viable && c.segment === 'WFD').length

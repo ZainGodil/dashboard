@@ -47,7 +47,7 @@ export interface FunnelStageDef {
 // (internal enum names for default/system statuses), others are human-readable Title Case
 // (custom statuses). Normalize to uppercase with underscores replaced by spaces so both
 // forms compare equal, regardless of which casing/format HubSpot happens to return.
-function normalizeStatus(raw: string | null): string {
+export function normalizeStatus(raw: string | null): string {
   return (raw ?? '').trim().toUpperCase().replace(/_/g, ' ')
 }
 

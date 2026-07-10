@@ -35,10 +35,6 @@ export async function GET(req: NextRequest) {
     const ownerMap = await fetchOwnerMap()
     step = 'deals'
     const enrolledDealContactIds = await fetchEnrolledContactIds()
-    step = 'deal-stages'
-    const stageLabelMap = await fetchDealStageLabelMap()
-    step = 'all-deals'
-    const allDeals = await fetchAllDeals(ownerMap, stageLabelMap)
     step = 'contacts'
     // Fetch all members of HubSpot list 5711 (maintained in HubSpot UI)
     const contacts = await fetchAllContacts()
@@ -166,6 +162,11 @@ export async function GET(req: NextRequest) {
     await recomputeCacMetrics(Array.from(monthSet))
 
     await recomputeRollingMetrics()
+
+    step = 'deal-stages'
+    const stageLabelMap = await fetchDealStageLabelMap()
+    step = 'all-deals'
+    const allDeals = await fetchAllDeals(ownerMap, stageLabelMap)
 
     step = 'deals-upsert'
     const dealRows = allDeals.map((d) => {
