@@ -7,22 +7,26 @@ import { sortMonthLabelsDesc } from '@/lib/metrics/periods'
 import {
   computeStageCounts,
   computeStagePercents,
+  computeRawStatusRows,
   normalizeStatus,
   sumStageCounts,
   type StageCounts,
   type StagePercents,
+  type RawStatusRow,
 } from '@/lib/funnel/stages'
 
 export interface AdvisorFunnelRow {
   advisor: string
   counts: StageCounts
   percents: StagePercents
+  rawStatusRows: RawStatusRow[]
 }
 
 export interface SourceFunnelRow {
   source: string
   counts: StageCounts
   percents: StagePercents
+  rawStatusRows: RawStatusRow[]
 }
 
 export interface AdvisorSourceFunnel {
@@ -82,11 +86,16 @@ export default async function FunnelPage({ searchParams }: { searchParams: { m?:
     const advisorContacts = allContacts.filter((c) => c.advisor === advisor)
     const advisorDeals = allDeals.filter((d) => d.advisor === advisor)
     const counts = computeStageCounts(advisorContacts, advisorDeals)
-    return { advisor, counts, percents: computeStagePercents(counts) }
+    return { advisor, counts, percents: computeStagePercents(counts), rawStatusRows: computeRawStatusRows(advisorContacts) }
   })
 
   const totalCounts = sumStageCounts(advisors.map((a) => a.counts))
-  const totalRow: AdvisorFunnelRow = { advisor: 'Total', counts: totalCounts, percents: computeStagePercents(totalCounts) }
+  const totalRow: AdvisorFunnelRow = {
+    advisor: 'Total',
+    counts: totalCounts,
+    percents: computeStagePercents(totalCounts),
+    rawStatusRows: computeRawStatusRows(allContacts.filter((c) => advisorNames.includes(c.advisor ?? ''))),
+  }
 
   // ── Source breakdown per advisor ──────────────────────────────────
   const sourceByContactId = new Map<string, string>()
@@ -102,7 +111,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: { m?:
         const sourceContacts = advisorContacts.filter((c) => (c.original_source ?? 'Unknown') === source)
         const sourceDeals = advisorDeals.filter((d) => sourceByContactId.get(d.contact_hubspot_id ?? '') === source)
         const counts = computeStageCounts(sourceContacts, sourceDeals)
-        return { source, counts, percents: computeStagePercents(counts) }
+        return { source, counts, percents: computeStagePercents(counts), rawStatusRows: computeRawStatusRows(sourceContacts) }
       })
       .sort((a, b) => b.counts.total - a.counts.total)
 

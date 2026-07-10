@@ -129,6 +129,44 @@ export function sumStageCounts(rows: StageCounts[]): StageCounts {
   return sum
 }
 
+export interface RawStatusRow {
+  label: string
+  total: number
+  nonViable: number
+  unqualified: number
+}
+
+// Matches the raw per-status breakdown table from "By AA analysis" / "By Source and AA":
+// one row per lead_status value, showing how many contacts have that status (regardless
+// of viable/qualified), and of those, how many are also flagged non-viable or unqualified.
+const RAW_STATUS_LABELS = [
+  'Unqualified', 'Attempted to Contact', 'On hold', 'Student',
+  'Booked Decision Appointment', 'Interview No Show', 'In Progress', 'Self-Paced',
+  'No Status', 'Career Consultation Booked', 'Email/Text', 'Connected',
+  'Bad Timing', 'Open Deal',
+]
+
+export function computeRawStatusRows(contacts: FunnelContactRow[]): RawStatusRow[] {
+  return RAW_STATUS_LABELS.map((label) => {
+    const rows = contacts.filter((c) => normalizeStatus(c.lead_status) === normalizeStatus(label))
+    return {
+      label,
+      total: rows.length,
+      nonViable: rows.filter((c) => !c.viable).length,
+      unqualified: rows.filter((c) => c.viable && isUnqualified(c.lead_status)).length,
+    }
+  })
+}
+
+export function sumRawStatusRows(rows: RawStatusRow[][]): RawStatusRow[] {
+  return RAW_STATUS_LABELS.map((label) => ({
+    label,
+    total: rows.reduce((s, r) => s + (r.find((x) => x.label === label)?.total ?? 0), 0),
+    nonViable: rows.reduce((s, r) => s + (r.find((x) => x.label === label)?.nonViable ?? 0), 0),
+    unqualified: rows.reduce((s, r) => s + (r.find((x) => x.label === label)?.unqualified ?? 0), 0),
+  }))
+}
+
 export const FUNNEL_STAGES: FunnelStageDef[] = [
   { key: 'total', label: 'Total Leads', group: 'INTAKE' },
   { key: 'nonViable', label: 'Non Viable', group: 'INTAKE', subtract: true },
@@ -142,4 +180,26 @@ export const FUNNEL_STAGES: FunnelStageDef[] = [
   { key: 'bookedDecision', label: 'Booked Decision', group: 'APPOINTMENTS', percentKey: 'bookedDecision' },
   { key: 'invoice', label: 'Invoice', group: 'OUTCOME', percentKey: 'invoice' },
   { key: 'conversion', label: 'Conversion', group: 'OUTCOME', highlight: 'green', percentKey: 'conversion' },
+]
+
+export interface FunnelChartStageDef {
+  key: keyof StageCounts
+  label: string
+  percentKey?: keyof StagePercents
+}
+
+// Matches the per-advisor/per-source funnel summary table + chart exactly (Total Leads
+// through conversion) — skips the Non Viable/Unqualified subtract rows shown separately
+// in the raw status table.
+export const FUNNEL_CHART_STAGES: FunnelChartStageDef[] = [
+  { key: 'total', label: 'Total Leads' },
+  { key: 'viable', label: 'Viable Leads', percentKey: 'viable' },
+  { key: 'contacted', label: 'Contacted', percentKey: 'contacted' },
+  { key: 'appointments', label: 'Appointments', percentKey: 'appointments' },
+  { key: 'noShows', label: 'No shows', percentKey: 'noShows' },
+  { key: 'appAttended', label: 'App attended', percentKey: 'appAttended' },
+  { key: 'inProgress', label: 'In progress', percentKey: 'inProgress' },
+  { key: 'bookedDecision', label: 'Book decision app', percentKey: 'bookedDecision' },
+  { key: 'invoice', label: 'invoice', percentKey: 'invoice' },
+  { key: 'conversion', label: 'conversion', percentKey: 'conversion' },
 ]

@@ -3,10 +3,43 @@ import {
   isUnqualified,
   computeStageCounts,
   computeStagePercents,
+  computeRawStatusRows,
   sumStageCounts,
   type FunnelContactRow,
   type FunnelDealRow,
 } from './stages'
+
+describe('computeRawStatusRows', () => {
+  it('counts total/nonViable/unqualified per status label, case-insensitively', () => {
+    const contacts: FunnelContactRow[] = [
+      { lead_status: 'UNQUALIFIED', viable: true },
+      { lead_status: 'Unqualified', viable: false },
+      { lead_status: 'On hold', viable: true },
+      { lead_status: 'ON_HOLD', viable: true },
+      { lead_status: 'Career Consultation Booked', viable: false },
+    ]
+    const rows = computeRawStatusRows(contacts)
+
+    const unqualifiedRow = rows.find((r) => r.label === 'Unqualified')!
+    expect(unqualifiedRow.total).toBe(2)
+    expect(unqualifiedRow.nonViable).toBe(1)
+    expect(unqualifiedRow.unqualified).toBe(1) // only the viable=true UNQUALIFIED row counts
+
+    const onHoldRow = rows.find((r) => r.label === 'On hold')!
+    expect(onHoldRow.total).toBe(2) // 'On hold' and 'ON_HOLD' both normalize the same
+
+    const careerRow = rows.find((r) => r.label === 'Career Consultation Booked')!
+    expect(careerRow.total).toBe(1)
+    expect(careerRow.nonViable).toBe(1)
+    expect(careerRow.unqualified).toBe(0)
+  })
+
+  it('returns a row for every known status even with no matching contacts', () => {
+    const rows = computeRawStatusRows([])
+    expect(rows).toHaveLength(14)
+    expect(rows.every((r) => r.total === 0 && r.nonViable === 0 && r.unqualified === 0)).toBe(true)
+  })
+})
 
 describe('isUnqualified', () => {
   it('flags the three UQ statuses', () => {
