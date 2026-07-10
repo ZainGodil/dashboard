@@ -68,7 +68,7 @@ export default function FunnelMatrix({ advisors, total }: { advisors: AdvisorFun
                 {stage.isGroupFirst && (
                   <tr>
                     <td
-                      colSpan={2 + (advisors.length + 1) * 2}
+                      colSpan={1 + (advisors.length + 1) * 2}
                       className="px-4 py-1 text-[9px] uppercase tracking-[0.9px] text-slate-500 font-bold bg-slate-100 border-b border-slate-200"
                     >
                       {GROUP_LABELS[stage.group]}
