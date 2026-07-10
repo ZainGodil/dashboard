@@ -121,3 +121,24 @@ describe('sumStageCounts', () => {
     expect(sum.contacted).toBe(2)
   })
 })
+
+describe('normalization handles real HubSpot lead_status casing variants', () => {
+  it('matches ALL_CAPS internal names', () => {
+    expect(isUnqualified('UNQUALIFIED')).toBe(true)
+    const counts = computeStageCounts([
+      { lead_status: 'IN_PROGRESS', viable: true },
+      { lead_status: 'CONNECTED', viable: true },
+      { lead_status: 'OPEN_DEAL', viable: true },
+      { lead_status: 'BAD_TIMING', viable: true },
+    ], [])
+    expect(counts.inProgress).toBe(1)
+    expect(counts.appointments).toBe(1) // IN_PROGRESS is the only APPOINTMENT_STATUSES member here
+    expect(counts.contacted).toBe(4) // all 4 are CONTACTED_STATUSES members
+  })
+
+  it('matches mixed-case variants like "On hold" and "Wrong number"', () => {
+    expect(isUnqualified('Wrong number')).toBe(true)
+    const counts = computeStageCounts([{ lead_status: 'On hold', viable: true }], [])
+    expect(counts.contacted).toBe(1)
+  })
+})

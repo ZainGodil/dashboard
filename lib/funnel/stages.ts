@@ -43,23 +43,31 @@ export interface FunnelStageDef {
   percentKey?: keyof StagePercents
 }
 
+// HubSpot returns lead_status inconsistently: some values are ALL_CAPS_WITH_UNDERSCORES
+// (internal enum names for default/system statuses), others are human-readable Title Case
+// (custom statuses). Normalize to uppercase with underscores replaced by spaces so both
+// forms compare equal, regardless of which casing/format HubSpot happens to return.
+function normalizeStatus(raw: string | null): string {
+  return (raw ?? '').trim().toUpperCase().replace(/_/g, ' ')
+}
+
 // Static Lead Status -> Qualified lookup, replicating the Excel's XLOOKUP table
 // (sheet "hubspot-crm-exports-cac-view-ne", columns X:Z).
-const UNQUALIFIED_STATUSES = new Set(['Not Interested', 'Unqualified', 'Wrong Number'])
+const UNQUALIFIED_STATUSES = new Set(['NOT INTERESTED', 'UNQUALIFIED', 'WRONG NUMBER'])
 
 export function isUnqualified(leadStatus: string | null): boolean {
-  return UNQUALIFIED_STATUSES.has(leadStatus ?? '')
+  return UNQUALIFIED_STATUSES.has(normalizeStatus(leadStatus))
 }
 
 // Matches "By AA analysis - (Old Version)"'s Contacted row: SUM(D7:D11,D14:D18)
 const CONTACTED_STATUSES = new Set([
-  'On Hold', 'Student', 'Booked Decision Appointment', 'Interview No Show',
-  'In Progress', 'Self-Paced', 'Career Consultation Booked', 'Email/Text',
-  'Connected', 'Bad Timing', 'Open Deal',
+  'ON HOLD', 'STUDENT', 'BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW',
+  'IN PROGRESS', 'SELF-PACED', 'CAREER CONSULTATION BOOKED', 'EMAIL/TEXT',
+  'CONNECTED', 'BAD TIMING', 'OPEN DEAL',
 ])
 
 // Matches the Appointments row: SUM(D9:D11)
-const APPOINTMENT_STATUSES = new Set(['Booked Decision Appointment', 'Interview No Show', 'In Progress'])
+const APPOINTMENT_STATUSES = new Set(['BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW', 'IN PROGRESS'])
 
 // Real HubSpot "closed won / enrolled" stage_label variants confirmed against production
 // deals table (the Excel source-of-truth's literal "Student" label does not occur in the
@@ -76,12 +84,12 @@ export function computeStageCounts(contacts: FunnelContactRow[], deals: FunnelDe
   const nonViable = contacts.filter((c) => !c.viable).length
   const unqualified = contacts.filter((c) => c.viable && isUnqualified(c.lead_status)).length
   const viable = total - nonViable - unqualified
-  const contacted = contacts.filter((c) => CONTACTED_STATUSES.has(c.lead_status ?? '')).length
-  const appointments = contacts.filter((c) => APPOINTMENT_STATUSES.has(c.lead_status ?? '')).length
-  const noShows = contacts.filter((c) => c.lead_status === 'Interview No Show').length
+  const contacted = contacts.filter((c) => CONTACTED_STATUSES.has(normalizeStatus(c.lead_status))).length
+  const appointments = contacts.filter((c) => APPOINTMENT_STATUSES.has(normalizeStatus(c.lead_status))).length
+  const noShows = contacts.filter((c) => normalizeStatus(c.lead_status) === 'INTERVIEW NO SHOW').length
   const appAttended = Math.max(0, appointments - noShows)
-  const inProgress = contacts.filter((c) => c.lead_status === 'In Progress').length
-  const bookedDecision = contacts.filter((c) => c.lead_status === 'Booked Decision Appointment').length
+  const inProgress = contacts.filter((c) => normalizeStatus(c.lead_status) === 'IN PROGRESS').length
+  const bookedDecision = contacts.filter((c) => normalizeStatus(c.lead_status) === 'BOOKED DECISION APPOINTMENT').length
   const invoice = deals.filter((d) => d.stage_label === 'Invoice Sent' || CONVERSION_STAGE_LABELS.has(d.stage_label ?? '')).length
   const conversion = deals.filter((d) => CONVERSION_STAGE_LABELS.has(d.stage_label ?? '')).length
 
