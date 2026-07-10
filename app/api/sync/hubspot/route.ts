@@ -154,6 +154,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const monthSet = new Set<string>()
+    for (const r of rows) {
+      if (r.create_date) monthSet.add(formatMonth(r.create_date))
+    }
+    // Also include enrollment months so deal-close months get recomputed even
+    // when no new leads were created that month.
+    for (const r of enrolledRows) {
+      if (r.month) monthSet.add(r.month)
+    }
+    await recomputeCacMetrics(Array.from(monthSet))
+
+    await recomputeRollingMetrics()
+
     step = 'deals-upsert'
     const dealRows = allDeals.map((d) => {
       const closeDate = d.close_date_raw
@@ -181,19 +194,6 @@ export async function GET(req: NextRequest) {
         if (error) throw new Error(`Deals upsert error: ${error.message}`)
       }
     }
-
-    const monthSet = new Set<string>()
-    for (const r of rows) {
-      if (r.create_date) monthSet.add(formatMonth(r.create_date))
-    }
-    // Also include enrollment months so deal-close months get recomputed even
-    // when no new leads were created that month.
-    for (const r of enrolledRows) {
-      if (r.month) monthSet.add(r.month)
-    }
-    await recomputeCacMetrics(Array.from(monthSet))
-
-    await recomputeRollingMetrics()
 
     await writeSyncLog(supabase, startedAt, recordsSynced, 'success', null)
     return NextResponse.json({
