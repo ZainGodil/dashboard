@@ -2,16 +2,35 @@
 
 import { useState } from 'react'
 import AdvisorFunnelCard from './AdvisorFunnelCard'
-import type { AdvisorSourceFunnel } from './page'
+import type { AdvisorSourceFunnel, SourceFunnelRow } from './page'
 import { sumStageCounts, sumRawStatusRows, computeStagePercents } from '@/lib/funnel/stages'
 
+function aggregateBySource(sourceFunnels: AdvisorSourceFunnel[]): SourceFunnelRow[] {
+  const bySource = new Map<string, SourceFunnelRow[]>()
+  for (const { rows } of sourceFunnels) {
+    for (const row of rows) {
+      const existing = bySource.get(row.source) ?? []
+      existing.push(row)
+      bySource.set(row.source, existing)
+    }
+  }
+  return Array.from(bySource.entries())
+    .map(([source, rows]) => {
+      const counts = sumStageCounts(rows.map((r) => r.counts))
+      return { source, counts, percents: computeStagePercents(counts), rawStatusRows: sumRawStatusRows(rows.map((r) => r.rawStatusRows)) }
+    })
+    .sort((a, b) => b.counts.total - a.counts.total)
+}
+
 export default function BySourceTabs({ sourceFunnels }: { sourceFunnels: AdvisorSourceFunnel[] }) {
-  const [advisorIdx, setAdvisorIdx] = useState(0)
-  const [sourceIdx, setSourceIdx] = useState(0) // 0 = Total, 1..N = rows[i-1]
+  const [advisorIdx, setAdvisorIdx] = useState(0) // 0 = Total (all advisors), 1..N = sourceFunnels[i-1]
+  const [sourceIdx, setSourceIdx] = useState(0) // 0 = Total (this advisor's sources), 1..N = rows[i-1]
 
   if (!sourceFunnels.length) return null
 
-  const { advisor, rows } = sourceFunnels[advisorIdx]
+  const advisor = advisorIdx === 0 ? 'All Advisors' : sourceFunnels[advisorIdx - 1].advisor
+  const rows = advisorIdx === 0 ? aggregateBySource(sourceFunnels) : sourceFunnels[advisorIdx - 1].rows
+
   const totalCounts = sumStageCounts(rows.map((r) => r.counts))
   const totalRawStatusRows = sumRawStatusRows(rows.map((r) => r.rawStatusRows))
 
@@ -31,12 +50,20 @@ export default function BySourceTabs({ sourceFunnels }: { sourceFunnels: Advisor
       <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-3 flex-wrap">
         <span className="font-display text-[13px] font-bold text-slate-900">By Source and AA</span>
         <div className="flex gap-1 flex-wrap">
+          <button
+            onClick={() => selectAdvisor(0)}
+            className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all ${
+              advisorIdx === 0 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            Total
+          </button>
           {sourceFunnels.map(({ advisor: a }, i) => (
             <button
               key={a}
-              onClick={() => selectAdvisor(i)}
+              onClick={() => selectAdvisor(i + 1)}
               className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all ${
-                advisorIdx === i ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                advisorIdx === i + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
               }`}
             >
               {a.split(' ')[0]}
