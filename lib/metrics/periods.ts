@@ -53,3 +53,13 @@ export function getLast12Months(): string[] {
   }
   return months
 }
+
+export function parseMonthLabel(label: string): Date {
+  const [mon, yr] = label.split('-')
+  const idx = MONTH_LABELS.indexOf(mon)
+  return new Date(2000 + Number(yr), idx, 1)
+}
+
+export function sortMonthLabelsDesc(labels: string[]): string[] {
+  return [...labels].sort((a, b) => parseMonthLabel(b).getTime() - parseMonthLabel(a).getTime())
+}
