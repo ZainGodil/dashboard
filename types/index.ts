@@ -81,3 +81,16 @@ export interface SyncLog {
   status: 'success' | 'error'
   error_message: string | null
 }
+
+export interface Deal {
+  id: string
+  hubspot_deal_id: string
+  contact_hubspot_id: string | null
+  advisor: string | null
+  stage_label: string | null
+  amount: number | null
+  payment_frequency: string | null
+  close_date: string | null
+  month: string | null
+  synced_at: string
+}
