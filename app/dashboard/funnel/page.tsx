@@ -8,7 +8,6 @@ import {
   computeStageCounts,
   computeStagePercents,
   sumStageCounts,
-  isUnqualified,
   type StageCounts,
   type StagePercents,
 } from '@/lib/funnel/stages'
