@@ -61,6 +61,16 @@ const CONTACTED_STATUSES = new Set([
 // Matches the Appointments row: SUM(D9:D11)
 const APPOINTMENT_STATUSES = new Set(['Booked Decision Appointment', 'Interview No Show', 'In Progress'])
 
+// Real HubSpot "closed won / enrolled" stage_label variants confirmed against production
+// deals table (the Excel source-of-truth's literal "Student" label does not occur in the
+// live data). See task-10 report for the distribution query that confirmed this.
+const CONVERSION_STAGE_LABELS = new Set([
+  'Signed Promissory Note / Closed Won',
+  'CLOSED WON ENROLLMENT',
+  'Promissory Note Signed / Closed Won Enrollment',
+  'Signed Promissory note - Closed Won',
+])
+
 export function computeStageCounts(contacts: FunnelContactRow[], deals: FunnelDealRow[]): StageCounts {
   const total = contacts.length
   const nonViable = contacts.filter((c) => !c.viable).length
@@ -72,8 +82,8 @@ export function computeStageCounts(contacts: FunnelContactRow[], deals: FunnelDe
   const appAttended = Math.max(0, appointments - noShows)
   const inProgress = contacts.filter((c) => c.lead_status === 'In Progress').length
   const bookedDecision = contacts.filter((c) => c.lead_status === 'Booked Decision Appointment').length
-  const invoice = deals.filter((d) => d.stage_label === 'Invoice Sent' || d.stage_label === 'Student').length
-  const conversion = deals.filter((d) => d.stage_label === 'Student').length
+  const invoice = deals.filter((d) => d.stage_label === 'Invoice Sent' || CONVERSION_STAGE_LABELS.has(d.stage_label ?? '')).length
+  const conversion = deals.filter((d) => CONVERSION_STAGE_LABELS.has(d.stage_label ?? '')).length
 
   return { total, nonViable, unqualified, viable, contacted, appointments, noShows, appAttended, inProgress, bookedDecision, invoice, conversion }
 }

@@ -47,7 +47,7 @@ function buildKevinShaferJune26(): { contacts: FunnelContactRow[]; deals: Funnel
   const deals: FunnelDealRow[] = [
     { stage_label: 'Invoice Sent' },
     { stage_label: 'Invoice Sent' },
-    { stage_label: 'Student' },
+    { stage_label: 'Signed Promissory Note / Closed Won' },
   ]
 
   return { contacts, deals }
@@ -70,6 +70,20 @@ describe('computeStageCounts', () => {
     expect(counts.bookedDecision).toBe(1)
     expect(counts.invoice).toBe(3)
     expect(counts.conversion).toBe(1)
+  })
+
+  it('recognizes all 4 real HubSpot closed-won stage_label variants as Conversion', () => {
+    const deals: FunnelDealRow[] = [
+      { stage_label: 'Signed Promissory Note / Closed Won' },
+      { stage_label: 'CLOSED WON ENROLLMENT' },
+      { stage_label: 'Promissory Note Signed / Closed Won Enrollment' },
+      { stage_label: 'Signed Promissory note - Closed Won' },
+      { stage_label: 'Discovery' },
+    ]
+    const counts = computeStageCounts([], deals)
+
+    expect(counts.conversion).toBe(4)
+    expect(counts.invoice).toBe(4)
   })
 })
 
