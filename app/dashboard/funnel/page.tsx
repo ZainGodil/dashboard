@@ -4,6 +4,7 @@ import BySourceTabs from './BySourceTabs'
 import MonthSelector from './MonthSelector'
 import StatCard from '@/components/ui/StatCard'
 import { sortMonthLabelsDesc } from '@/lib/metrics/periods'
+import { fetchAllRows } from '@/lib/supabase/paginate'
 import {
   computeStageCounts,
   computeStagePercents,
@@ -52,13 +53,15 @@ interface DealRow {
 export default async function FunnelPage({ searchParams }: { searchParams: { m?: string } }) {
   const supabase = createAdminClient()
 
-  const { data: monthRows } = await supabase
-    .from('contacts')
-    .select('month')
-    .not('month', 'is', null)
+  // Supabase/PostgREST caps unbounded selects at the project's Max Rows setting
+  // (well under the 31k+ contact count), so this must page through .range() or
+  // recent months silently vanish from the dropdown — see AUDIT_REPORT.md #11.
+  const monthRows = await fetchAllRows<{ month: string }>((from, to) =>
+    supabase.from('contacts').select('month').not('month', 'is', null).range(from, to)
+  )
 
   const months = sortMonthLabelsDesc(
-    Array.from(new Set((monthRows ?? []).map((r) => r.month as string)))
+    Array.from(new Set(monthRows.map((r) => r.month)))
   )
   const selectedMonth = searchParams.m && months.includes(searchParams.m) ? searchParams.m : (months[0] ?? '')
 
