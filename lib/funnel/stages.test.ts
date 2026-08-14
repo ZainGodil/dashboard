@@ -16,7 +16,8 @@ describe('computeRawStatusRows', () => {
       { lead_status: 'Unqualified', viable: false },
       { lead_status: 'On hold', viable: true },
       { lead_status: 'ON_HOLD', viable: true },
-      { lead_status: 'Career Consultation Booked', viable: false },
+      // HubSpot's "Career Consultation Booked" option stores raw value "Applied".
+      { lead_status: 'Applied', viable: false },
     ]
     const rows = computeRawStatusRows(contacts)
 
@@ -72,7 +73,8 @@ function buildKevinShaferJune26(): { contacts: FunnelContactRow[]; deals: Funnel
   // Career Consultation Booked/Email-Text/Connected/Bad Timing/Open Deal are
   // collapsed into one CONTACTED-eligible bucket to hit Contacted=39 exactly
   // (39 - On Hold(4) - Booked Decision(1) - No Show(7) - In Progress(4) = 23).
-  push('Career Consultation Booked', 23)
+  // Raw HubSpot value for "Career Consultation Booked" is "Applied".
+  push('Applied', 23)
   // Padding: statuses excluded from every stage bucket (not unqualified, not
   // contacted), used only to bring Total Leads up to 152.
   push('Attempted to Contact', 94)

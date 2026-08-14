@@ -59,10 +59,17 @@ export function isUnqualified(leadStatus: string | null): boolean {
   return UNQUALIFIED_STATUSES.has(normalizeStatus(leadStatus))
 }
 
+// HubSpot's hs_lead_status option labeled "Career Consultation Booked" in the portal UI
+// stores the raw enum value "Applied" (an old internal name kept after a display-label
+// rename — confirmed via the portal's property schema, 2026-08-14). The API and our
+// Supabase sync only ever see "Applied", never the literal label text, so every place
+// that needs to match this status must key on APPLIED, not CAREER CONSULTATION BOOKED.
+const CAREER_CONSULTATION_RAW_VALUE = 'APPLIED'
+
 // Matches "By AA analysis - (Old Version)"'s Contacted row: SUM(D7:D11,D14:D18)
 const CONTACTED_STATUSES = new Set([
   'ON HOLD', 'STUDENT', 'BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW',
-  'IN PROGRESS', 'SELF-PACED', 'CAREER CONSULTATION BOOKED', 'EMAIL/TEXT',
+  'IN PROGRESS', 'SELF-PACED', CAREER_CONSULTATION_RAW_VALUE, 'EMAIL/TEXT',
   'CONNECTED', 'BAD TIMING', 'OPEN DEAL',
 ])
 
@@ -70,7 +77,7 @@ const CONTACTED_STATUSES = new Set([
 // per user request (2026-08-14) so it counts toward Appointments/App Attended in addition
 // to Contacted — it remains in CONTACTED_STATUSES too.
 const APPOINTMENT_STATUSES = new Set([
-  'BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW', 'IN PROGRESS', 'CAREER CONSULTATION BOOKED',
+  'BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW', 'IN PROGRESS', CAREER_CONSULTATION_RAW_VALUE,
 ])
 
 // Real HubSpot "closed won / enrolled" stage_label variants confirmed against production
@@ -150,9 +157,16 @@ const RAW_STATUS_LABELS = [
   'Bad Timing', 'Open Deal',
 ]
 
+// Display labels whose raw lead_status value (what's actually stored/matched)
+// differs from the label text itself. See CAREER_CONSULTATION_RAW_VALUE above.
+const RAW_STATUS_LABEL_VALUE_OVERRIDES: Partial<Record<string, string>> = {
+  'Career Consultation Booked': CAREER_CONSULTATION_RAW_VALUE,
+}
+
 export function computeRawStatusRows(contacts: FunnelContactRow[]): RawStatusRow[] {
   return RAW_STATUS_LABELS.map((label) => {
-    const rows = contacts.filter((c) => normalizeStatus(c.lead_status) === normalizeStatus(label))
+    const matchValue = RAW_STATUS_LABEL_VALUE_OVERRIDES[label] ?? label
+    const rows = contacts.filter((c) => normalizeStatus(c.lead_status) === normalizeStatus(matchValue))
     return {
       label,
       total: rows.length,
