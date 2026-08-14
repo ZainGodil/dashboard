@@ -66,8 +66,12 @@ const CONTACTED_STATUSES = new Set([
   'CONNECTED', 'BAD TIMING', 'OPEN DEAL',
 ])
 
-// Matches the Appointments row: SUM(D9:D11)
-const APPOINTMENT_STATUSES = new Set(['BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW', 'IN PROGRESS'])
+// Matches the Appointments row: SUM(D9:D11). Also includes Career Consultation Booked
+// per user request (2026-08-14) so it counts toward Appointments/App Attended in addition
+// to Contacted — it remains in CONTACTED_STATUSES too.
+const APPOINTMENT_STATUSES = new Set([
+  'BOOKED DECISION APPOINTMENT', 'INTERVIEW NO SHOW', 'IN PROGRESS', 'CAREER CONSULTATION BOOKED',
+])
 
 // Real HubSpot "closed won / enrolled" stage_label variants confirmed against production
 // deals table (the Excel source-of-truth's literal "Student" label does not occur in the

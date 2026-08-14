@@ -96,9 +96,11 @@ describe('computeStageCounts', () => {
     expect(counts.unqualified).toBe(12)
     expect(counts.viable).toBe(133)
     expect(counts.contacted).toBe(39)
-    expect(counts.appointments).toBe(12) // Booked Decision(1) + No Show(7) + In Progress(4)
+    // Booked Decision(1) + No Show(7) + In Progress(4) + Career Consultation Booked(23),
+    // now included in APPOINTMENT_STATUSES per user request (2026-08-14).
+    expect(counts.appointments).toBe(35)
     expect(counts.noShows).toBe(7)
-    expect(counts.appAttended).toBe(5)
+    expect(counts.appAttended).toBe(28)
     expect(counts.inProgress).toBe(4)
     expect(counts.bookedDecision).toBe(1)
     expect(counts.invoice).toBe(3)
@@ -128,11 +130,11 @@ describe('computeStagePercents', () => {
 
     expect(pct.viable).toBeCloseTo(133 / 152, 5) // 0.875
     expect(pct.contacted).toBeCloseTo(39 / 133, 5) // 0.29323...
-    expect(pct.appointments).toBeCloseTo(12 / 39, 5) // 0.30769...
-    expect(pct.noShows).toBeCloseTo(7 / 12, 5) // 0.58333...
-    expect(pct.appAttended).toBeCloseTo(5 / 12, 5) // 0.41667...
-    expect(pct.inProgress).toBeCloseTo(0.8, 5)
-    expect(pct.bookedDecision).toBeCloseTo(0.2, 5)
+    expect(pct.appointments).toBeCloseTo(35 / 39, 5)
+    expect(pct.noShows).toBeCloseTo(7 / 35, 5)
+    expect(pct.appAttended).toBeCloseTo(28 / 35, 5)
+    expect(pct.inProgress).toBeCloseTo(4 / 28, 5)
+    expect(pct.bookedDecision).toBeCloseTo(1 / 28, 5)
     expect(pct.invoice).toBeCloseTo(3 / 133, 5) // 0.02256...
     expect(pct.conversion).toBeCloseTo(1 / 133, 5) // 0.00752...
   })
