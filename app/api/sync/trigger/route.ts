@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
   }
 
   const origin = new URL(req.url).origin
-  const path = validSource === 'ads' ? '/api/sync/ads' : '/api/sync/hubspot'
+  // Dashboard-initiated HubSpot syncs only pull what changed; the nightly cron does the full pass
+  const path = validSource === 'ads' ? '/api/sync/ads' : '/api/sync/hubspot?mode=incremental'
 
   const upstream = await fetch(`${origin}${path}`, {
     method: 'GET',

@@ -8,7 +8,12 @@ import { createClient } from '@/lib/supabase/client'
 interface SyncInfo {
   hubspot?: string
   ads?: string
+  hubspotError?: { at: string; message: string }
 }
+
+// Opening the dashboard kicks off an incremental HubSpot sync when the last attempt
+// is older than this, so data stays fresh between the nightly full syncs.
+const HUBSPOT_AUTO_SYNC_AFTER_MS = 15 * 60 * 1000
 
 const NAV_REPORTS = [
   {
@@ -129,6 +134,17 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
       if (timers.ads) clearTimeout(timers.ads)
       if (timers.hubspot) clearTimeout(timers.hubspot)
     }
+  }, [])
+
+  // Once per mount: refresh HubSpot in the background if the last attempt is stale
+  const autoSyncChecked = useRef(false)
+  useEffect(() => {
+    if (autoSyncChecked.current) return
+    autoSyncChecked.current = true
+    const attempts = [syncInfo?.hubspot, syncInfo?.hubspotError?.at].filter((t): t is string => !!t)
+    const lastAttempt = attempts.length ? Math.max(...attempts.map((t) => new Date(t).getTime())) : 0
+    if (Date.now() - lastAttempt > HUBSPOT_AUTO_SYNC_AFTER_MS) handleSync('hubspot')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSignOut() {
@@ -272,7 +288,12 @@ export default function Sidebar({ syncInfo }: { syncInfo?: SyncInfo }) {
                 <span className={`w-1.5 h-1.5 rounded-full ${dot} shrink-0`} />
                 <span className="text-[10px] text-slate-500">{label}</span>
                 <span className="ml-auto flex items-center gap-1.5">
-                  {ts && state === 'idle' && (
+                  {key === 'hubspot' && syncInfo?.hubspotError && state === 'idle' && (
+                    <span className="text-[10px] text-red-400" title={syncInfo.hubspotError.message}>
+                      failed {relativeTime(syncInfo.hubspotError.at)}
+                    </span>
+                  )}
+                  {ts && state === 'idle' && !(key === 'hubspot' && syncInfo?.hubspotError) && (
                     <span className="text-[10px] text-slate-400">{relativeTime(ts)}</span>
                   )}
                   {state === 'success' && (
