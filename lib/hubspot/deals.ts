@@ -66,34 +66,23 @@ export interface EnrolledDealData {
 
 // Returns Map<contactId, { closedate, amount, payment_frequency }>
 export async function fetchEnrolledContactIds(): Promise<Map<string, EnrolledDealData>> {
+  return buildEnrolledMap(await fetchAllRawDeals())
+}
+
+// Builds Map<contactId, enrolled deal data> from deals in the order given — the
+// first enrolled-stage deal seen for a contact wins (deals list API returns id order).
+export function buildEnrolledMap(deals: FullDeal[]): Map<string, EnrolledDealData> {
   const contactDeals = new Map<string, EnrolledDealData>()
-  let after: string | undefined
-
-  do {
-    const params = new URLSearchParams({
-      limit: '100',
-      properties: 'dealstage,closedate,amount,payment_frequency',
-      associations: 'contacts',
-      ...(after ? { after } : {}),
-    })
-
-    const data = await hubspotFetch<DealsResponse>(`/crm/v3/objects/deals?${params}`)
-
-    for (const deal of data.results) {
-      if (ENROLLED_STAGES.has(deal.properties.dealstage ?? '')) {
-        const closedate = deal.properties.closedate ?? null
-        const amount = Number(deal.properties.amount ?? 0)
-        const payment_frequency = deal.properties.payment_frequency ?? null
-        const contacts = deal.associations?.contacts?.results ?? []
-        for (const c of contacts) {
-          if (!contactDeals.has(c.id)) contactDeals.set(c.id, { closedate, amount, payment_frequency })
-        }
-      }
+  for (const deal of deals) {
+    if (!ENROLLED_STAGES.has(deal.properties.dealstage ?? '')) continue
+    const closedate = deal.properties.closedate ?? null
+    const amount = Number(deal.properties.amount ?? 0)
+    const payment_frequency = deal.properties.payment_frequency ?? null
+    const contacts = deal.associations?.contacts?.results ?? []
+    for (const c of contacts) {
+      if (!contactDeals.has(c.id)) contactDeals.set(c.id, { closedate, amount, payment_frequency })
     }
-
-    after = data.paging?.next?.after
-  } while (after)
-
+  }
   return contactDeals
 }
 
@@ -133,7 +122,7 @@ export interface DealFetchRecord {
   close_date_raw: string | null
 }
 
-interface FullDeal {
+export interface FullDeal {
   id: string
   properties: {
     dealstage: string | null
@@ -157,35 +146,49 @@ export async function fetchAllDeals(
   ownerMap: Map<string, string>,
   stageLabelMap: Map<string, string>
 ): Promise<DealFetchRecord[]> {
-  const records: DealFetchRecord[] = []
+  const deals = await fetchAllRawDeals()
+  return deals.map((d) => toDealRecord(d, ownerMap, stageLabelMap))
+}
+
+export const DEAL_PROPERTIES = ['dealstage', 'pipeline', 'closedate', 'amount', 'payment_frequency', 'hubspot_owner_id']
+
+// Pages through every deal once, with contact associations. Both the enrollment map
+// and the `deals` table rows are derived from this single pass.
+export async function fetchAllRawDeals(): Promise<FullDeal[]> {
+  const deals: FullDeal[] = []
   let after: string | undefined
 
   do {
     const params = new URLSearchParams({
       limit: '100',
-      properties: 'dealstage,pipeline,closedate,amount,payment_frequency,hubspot_owner_id',
+      properties: DEAL_PROPERTIES.join(','),
       associations: 'contacts',
       ...(after ? { after } : {}),
     })
 
     const data = await hubspotFetch<FullDealsResponse>(`/crm/v3/objects/deals?${params}`)
-
-    for (const deal of data.results) {
-      const contacts = deal.associations?.contacts?.results ?? []
-      const stageKey = `${deal.properties.pipeline ?? ''}:${deal.properties.dealstage ?? ''}`
-      records.push({
-        hubspot_deal_id: deal.id,
-        contact_hubspot_id: contacts[0]?.id ?? null,
-        advisor: deal.properties.hubspot_owner_id ? (ownerMap.get(deal.properties.hubspot_owner_id) ?? null) : null,
-        stage_label: stageLabelMap.get(stageKey) ?? null,
-        amount: deal.properties.amount ? Number(deal.properties.amount) : null,
-        payment_frequency: deal.properties.payment_frequency ?? null,
-        close_date_raw: deal.properties.closedate ?? null,
-      })
-    }
+    deals.push(...data.results)
 
     after = data.paging?.next?.after
   } while (after)
 
-  return records
+  return deals
+}
+
+export function toDealRecord(
+  deal: FullDeal,
+  ownerMap: Map<string, string>,
+  stageLabelMap: Map<string, string>
+): DealFetchRecord {
+  const contacts = deal.associations?.contacts?.results ?? []
+  const stageKey = `${deal.properties.pipeline ?? ''}:${deal.properties.dealstage ?? ''}`
+  return {
+    hubspot_deal_id: deal.id,
+    contact_hubspot_id: contacts[0]?.id ?? null,
+    advisor: deal.properties.hubspot_owner_id ? (ownerMap.get(deal.properties.hubspot_owner_id) ?? null) : null,
+    stage_label: stageLabelMap.get(stageKey) ?? null,
+    amount: deal.properties.amount ? Number(deal.properties.amount) : null,
+    payment_frequency: deal.properties.payment_frequency ?? null,
+    close_date_raw: deal.properties.closedate ?? null,
+  }
 }
