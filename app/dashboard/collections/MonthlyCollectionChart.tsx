@@ -2,21 +2,24 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
-interface CollectionPoint {
-  month: string
-  expected: number
-  collected: number
+export interface ChartSeries {
+  key: string
+  name: string
+  color: string
 }
 
 interface MonthlyCollectionChartProps {
-  data: CollectionPoint[]
+  title: string
+  subtitle: string
+  data: Record<string, string | number>[]
+  series: ChartSeries[]
 }
 
-export default function MonthlyCollectionChart({ data }: MonthlyCollectionChartProps) {
+export default function MonthlyCollectionChart({ title, subtitle, data, series }: MonthlyCollectionChartProps) {
   return (
     <div>
-      <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">Monthly Collection 2026</div>
-      <div className="text-[11px] text-slate-400 mb-3">Expected (Total Collection) vs Collected (Cash Received) · Aug is part-month, Sep–Dec not yet due</div>
+      <div className="font-display text-[12px] font-bold text-slate-900 uppercase tracking-[0.5px] mb-0.5">{title}</div>
+      <div className="text-[11px] text-slate-400 mb-3">{subtitle}</div>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
@@ -33,8 +36,9 @@ export default function MonthlyCollectionChart({ data }: MonthlyCollectionChartP
             wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
             formatter={(value) => <span className="text-slate-500">{value}</span>}
           />
-          <Bar dataKey="expected" name="Expected" fill="#CBD5E1" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="collected" name="Collected" fill="#2563EB" radius={[3, 3, 0, 0]} />
+          {series.map((s) => (
+            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} />
+          ))}
         </BarChart>
       </ResponsiveContainer>
     </div>

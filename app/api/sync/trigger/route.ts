@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 300
 
-type Source = 'ads' | 'hubspot'
+type Source = 'ads' | 'hubspot' | 'stripe'
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const source = body.source as string | undefined
 
-  if (source !== 'ads' && source !== 'hubspot') {
-    return NextResponse.json({ error: 'Invalid source. Must be "ads" or "hubspot".' }, { status: 400 })
+  if (source !== 'ads' && source !== 'hubspot' && source !== 'stripe') {
+    return NextResponse.json({ error: 'Invalid source. Must be "ads", "hubspot" or "stripe".' }, { status: 400 })
   }
 
   const validSource: Source = source
@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
 
   const origin = new URL(req.url).origin
   // Dashboard-initiated HubSpot syncs only pull what changed; the nightly cron does the full pass
-  const path = validSource === 'ads' ? '/api/sync/ads' : '/api/sync/hubspot?mode=incremental'
+  const path =
+    validSource === 'ads' ? '/api/sync/ads'
+    : validSource === 'stripe' ? '/api/sync/stripe'
+    : '/api/sync/hubspot?mode=incremental'
 
   const upstream = await fetch(`${origin}${path}`, {
     method: 'GET',
