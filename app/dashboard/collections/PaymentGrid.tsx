@@ -1,31 +1,40 @@
-import { MONTHS, type SampleStudent } from './data'
+import { MONTHS } from './data'
 
 const money = (v: number) => `$${Math.round(v).toLocaleString()}`
 
-export default function PaymentGrid({ students }: { students: SampleStudent[] }) {
+export type GridCell = { state: 'paid'; amount: number } | { state: 'missed'; reason?: string } | { state: 'none' }
+
+export interface GridRow {
+  key: string
+  name: string
+  meta: string[] // one value per entry in metaColumns
+  cells: GridCell[] // Jan–Dec
+}
+
+export default function PaymentGrid({ metaColumns, rows, totalLabel }: { metaColumns: string[]; rows: GridRow[]; totalLabel: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[11px]">
         <thead>
           <tr className="bg-slate-50 border-b border-slate-200">
-            {['Student', 'Program', 'Type', 'Status'].map((h) => (
+            {['Student', ...metaColumns].map((h) => (
               <th key={h} className="px-3 py-2.5 text-left text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap">{h}</th>
             ))}
             {MONTHS.map((m) => (
               <th key={m} className="px-1 py-2.5 text-center text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold">{m}</th>
             ))}
-            <th className="px-3 py-2.5 text-right text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap">2026 Total</th>
+            <th className="px-3 py-2.5 text-right text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap">{totalLabel}</th>
           </tr>
         </thead>
         <tbody>
-          {students.map((s) => {
+          {rows.map((s) => {
             const total = s.cells.reduce((sum, c) => sum + (c.state === 'paid' ? c.amount : 0), 0)
             return (
-              <tr key={s.name} className="border-b border-slate-100 hover:bg-slate-50">
+              <tr key={s.key} className="border-b border-slate-100 hover:bg-slate-50">
                 <td className="px-3 py-2 font-medium text-slate-800 whitespace-nowrap">{s.name}</td>
-                <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{s.program}</td>
-                <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{s.paymentType}</td>
-                <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{s.status}</td>
+                {s.meta.map((v, i) => (
+                  <td key={metaColumns[i]} className="px-3 py-2 text-slate-500 whitespace-nowrap">{v}</td>
+                ))}
                 {s.cells.map((c, i) => {
                   const month = MONTHS[i]
                   if (c.state === 'paid') {
@@ -40,7 +49,7 @@ export default function PaymentGrid({ students }: { students: SampleStudent[] })
                   if (c.state === 'missed') {
                     return (
                       <td key={month} className="px-0.5 py-1">
-                        <div title={`${s.name} · ${month} · Due, not received`} className="rounded bg-red-50 text-red-600 font-mono text-[10px] text-center py-1.5 min-w-[44px]">
+                        <div title={`${s.name} · ${month} · ${c.reason ? `Failed: ${c.reason}` : 'Due, not received'}`} className="rounded bg-red-50 text-red-600 font-mono text-[10px] text-center py-1.5 min-w-[44px]">
                           —
                         </div>
                       </td>
@@ -48,7 +57,7 @@ export default function PaymentGrid({ students }: { students: SampleStudent[] })
                   }
                   return (
                     <td key={month} className="px-0.5 py-1">
-                      <div title={`${s.name} · ${month} · Not due / not applicable`} className="rounded bg-slate-50 py-1.5 min-w-[44px] h-[27px]" />
+                      <div title={`${s.name} · ${month} · Nothing due or attempted`} className="rounded bg-slate-50 py-1.5 min-w-[44px] h-[27px]" />
                     </td>
                   )
                 })}
