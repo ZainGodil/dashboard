@@ -68,6 +68,17 @@ const NAV_REPORTS = [
       </svg>
     ),
   },
+  {
+    href: '/dashboard/collections',
+    label: 'Collections',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="1" y="3.5" width="14" height="9" rx="1.5"/>
+        <circle cx="8" cy="8" r="2"/>
+        <path d="M4 6v4M12 6v4"/>
+      </svg>
+    ),
+  },
 ]
 
 const NAV_SETTINGS = [
