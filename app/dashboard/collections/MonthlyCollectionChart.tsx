@@ -27,7 +27,12 @@ export default function MonthlyCollectionChart({ data }: MonthlyCollectionChartP
             contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0' }}
             formatter={(v, name) => [`$${Math.round(Number(v)).toLocaleString()}`, name]}
           />
-          <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+          <Legend
+            iconType="circle"
+            iconSize={8}
+            wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+            formatter={(value) => <span className="text-slate-500">{value}</span>}
+          />
           <Bar dataKey="expected" name="Expected" fill="#CBD5E1" radius={[3, 3, 0, 0]} />
           <Bar dataKey="collected" name="Collected" fill="#2563EB" radius={[3, 3, 0, 0]} />
         </BarChart>
