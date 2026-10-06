@@ -9,6 +9,9 @@ import StripeSyncButton from './StripeSyncButton'
 import StatusSelect from './StatusSelect'
 import RecordPaymentForm from './RecordPaymentForm'
 import DeleteManualPaymentButton from './DeleteManualPaymentButton'
+import HandleFlagButton from './HandleFlagButton'
+import ReopenFlagButton from './ReopenFlagButton'
+import { applyActions, chicagoToday, type ExceptionAction, type OpenException, type HandledException } from '@/lib/collections/exception-actions'
 import {
   AS_OF, MONTHLY, CLOSED_MONTHS, TOTAL_RECORDS, PAYMENT_MIX, STATUS_MIX,
   SAMPLE_STUDENTS, SAMPLE_EXCEPTIONS, type Flag,
@@ -60,6 +63,8 @@ interface CollectionsData {
   error: string | null // Stripe table missing or unreadable
   manualReady: boolean // manual_payments and student_status exist (migration 010)
   manual: ManualEntry[]
+  actionsReady: boolean // exception_actions exists (migration 011)
+  queue: { open: OpenException[]; handled: HandledException[] }
 }
 
 const errMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
@@ -87,11 +92,21 @@ async function loadCollections(): Promise<CollectionsData> {
       .range(from, to)
   ).then((rows) => ({ rows, ok: true }), () => ({ rows: [] as ManualEntry[], ok: false }))
 
-  const [stripeRes, manualRes, statusRes, logRes] = await Promise.all([
+  const actions = fetchAllRows<ExceptionAction>((from, to) =>
+    supabase
+      .from('exception_actions')
+      .select('id, student_key, flag_kind, flag_since, note, follow_up_on, created_by, created_at')
+      .is('reopened_at', null)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+  ).then((rows) => ({ rows, ok: true }), () => ({ rows: [] as ExceptionAction[], ok: false }))
+
+  const [stripeRes, manualRes, statusRes, logRes, actionsRes] = await Promise.all([
     stripe,
     manual,
     supabase.from('student_status').select('student_key, status'),
     supabase.from('sync_log').select('completed_at').eq('source', 'stripe').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
+    actions,
   ])
 
   const statusByKey = new Map<string, StudentStatus>(
@@ -112,17 +127,21 @@ async function loadCollections(): Promise<CollectionsData> {
     })),
   ]
 
+  const view = rows.length ? buildStripeView(rows, new Date(), statusByKey) : null
+
   return {
-    view: rows.length ? buildStripeView(rows, new Date(), statusByKey) : null,
+    view,
     lastSync: logRes.data?.[0]?.completed_at ?? null,
     error: stripeRes.error,
     manualReady: manualRes.ok && !statusRes.error,
     manual: manualRes.rows,
+    actionsReady: actionsRes.ok,
+    queue: applyActions(view?.exceptions ?? [], actionsRes.rows, chicagoToday()),
   }
 }
 
 export default async function CollectionsPage() {
-  const { view, lastSync, error, manualReady, manual } = await loadCollections()
+  const { view, lastSync, error, manualReady, manual, actionsReady, queue } = await loadCollections()
 
   return (
     <div>
@@ -144,7 +163,7 @@ export default async function CollectionsPage() {
           </div>
         )}
 
-        {view ? <LiveView view={view} manualReady={manualReady} /> : <SnapshotView stripeError={error} />}
+        {view ? <LiveView view={view} manualReady={manualReady} actionsReady={actionsReady} queue={queue} /> : <SnapshotView stripeError={error} />}
 
         {manualReady && manual.length > 0 && <RecordedPayments entries={manual} />}
 
@@ -168,7 +187,12 @@ export default async function CollectionsPage() {
 
 // ── Live: Stripe charges ─────────────────────────────────────────────────────
 
-function LiveView({ view, manualReady }: { view: StripeView; manualReady: boolean }) {
+function LiveView({ view, manualReady, actionsReady, queue }: {
+  view: StripeView
+  manualReady: boolean
+  actionsReady: boolean
+  queue: { open: OpenException[]; handled: HandledException[] }
+}) {
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -181,7 +205,13 @@ function LiveView({ view, manualReady }: { view: StripeView; manualReady: boolea
         <StatCard label={`Collected ${view.thisMonthLabel}`} value={k(view.collectedThisMonth)} delta="this month so far" accent="green" />
         <StatCard label="Failed, Last 30 Days" value={String(view.failedLast30.count)} delta={`${money(view.failedLast30.amount)} declined`} deltaDir={view.failedLast30.count ? 'down' : 'neutral'} accent="amber" />
         <StatCard label="Paying Students" value={String(view.payingStudents)} delta="paid in the last 60 days" accent="teal" />
-        <StatCard label="Needs Follow-Up" value={String(view.exceptions.length)} delta="see exception queue" deltaDir={view.exceptions.length ? 'down' : 'neutral'} accent="amber" />
+        <StatCard
+          label="Needs Follow-Up"
+          value={String(queue.open.length)}
+          delta={queue.handled.length ? `${queue.handled.length} handled` : 'see exception queue'}
+          deltaDir={queue.open.length ? 'down' : 'neutral'}
+          accent="amber"
+        />
       </div>
 
       <div className={`${CARD} p-5`}>
@@ -200,26 +230,41 @@ function LiveView({ view, manualReady }: { view: StripeView; manualReady: boolea
       <div className={`${CARD} overflow-hidden`}>
         <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-3">
           <span className="font-display text-[13px] font-bold text-slate-900">Exception Queue</span>
-          <Badge tone={view.exceptions.length ? 'amber' : 'emerald'}>{view.exceptions.length} to review</Badge>
+          <Badge tone={queue.open.length ? 'amber' : 'emerald'}>{queue.open.length} to review</Badge>
         </div>
-        {view.exceptions.length === 0 ? (
-          <div className="px-5 py-6 text-[12px] text-slate-400">Nothing to follow up: no failed last payments and no paying student quiet for 45+ days.</div>
+        {queue.open.length === 0 ? (
+          <div className="px-5 py-6 text-[12px] text-slate-400">
+            Nothing to follow up{queue.handled.length ? `; ${queue.handled.length} handled below` : ': no failed last payments and no paying student quiet for 45+ days'}.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[11px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag'].map((h) => <th key={h} className={TH}>{h}</th>)}
+                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag', ...(actionsReady ? [''] : [])].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {view.exceptions.map((r) => (
-                  <tr key={r.key} className="border-b border-slate-100 hover:bg-slate-50">
+                {queue.open.map((r) => (
+                  <tr key={`${r.key}:${r.kind}`} className="border-b border-slate-100 hover:bg-slate-50 align-top">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
                     <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
                     <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-2.5 font-mono text-slate-600">{shortDate(r.lastPaidAt)}</td>
-                    <td className="px-4 py-2.5"><span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{r.reason}</span></td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{r.reason}</span>
+                      {r.followUpDue && (
+                        <div className="mt-1.5 text-[10px] text-amber-700">
+                          Follow-up due {shortDate(`${r.followUpDue.follow_up_on}T18:00:00Z`)}: {r.followUpDue.note}
+                          <span className="text-slate-400"> · {r.followUpDue.created_by}</span>
+                        </div>
+                      )}
+                    </td>
+                    {actionsReady && (
+                      <td className="px-4 py-2 text-right">
+                        <HandleFlagButton studentKey={r.key} studentName={r.name} kind={r.kind} since={r.since} />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -228,8 +273,45 @@ function LiveView({ view, manualReady }: { view: StripeView; manualReady: boolea
         )}
         <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
           Flags: the student&apos;s latest Stripe charge failed, or they paid within the last 120 days but nothing in the last 45 (not raised for students marked Graduated).
+          {actionsReady && ' A handled flag comes back on its follow-up date, or when a newer payment fails.'}
         </div>
       </div>
+
+      {actionsReady && queue.handled.length > 0 && (
+        <div className={`${CARD} overflow-hidden`}>
+          <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-3">
+            <span className="font-display text-[13px] font-bold text-slate-900">Handled</span>
+            <Badge tone="emerald">{queue.handled.length}</Badge>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  {['Student', 'Flag', 'Note', 'Follow Up', 'Handled By', ''].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {queue.handled.map((r) => (
+                  <tr key={r.action.id} className="border-b border-slate-100 hover:bg-slate-50 align-top">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">
+                      {r.name}
+                      {r.email && <span className="block text-[10px] font-normal text-slate-400">{r.email}</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500">{r.reason}</td>
+                    <td className="px-4 py-2.5 text-slate-700 max-w-[360px]">{r.action.note}</td>
+                    <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{r.action.follow_up_on ? shortDate(`${r.action.follow_up_on}T18:00:00Z`) : '—'}</td>
+                    <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap">
+                      {r.action.created_by}
+                      <span className="block text-[10px]">{shortDate(r.action.created_at)}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right"><ReopenFlagButton id={r.action.id} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className={`${CARD} overflow-hidden`}>
         <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1">
