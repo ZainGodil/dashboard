@@ -39,6 +39,8 @@ export interface ExceptionRow {
   lastPaidAt: string | null
   flag: 'review'
   reason: string
+  kind: 'failed' | 'quiet'
+  since: string // the event that raised the flag: the failed charge, or the last successful payment
 }
 
 export interface StripeView {
@@ -144,12 +146,12 @@ export function buildStripeView(rows: PaymentRow[], now: Date, statusByKey: Map<
 
     const base = { key: k, name, email, status, lastPaidAt: row.lastPaidAt, flag: 'review' as const }
     if (last?.status === 'failed') {
-      exceptions.push({ ...base, reason: `Last payment failed${last.failure_message ? `: ${last.failure_message}` : ''}` })
+      exceptions.push({ ...base, kind: 'failed', since: last.created_at, reason: `Last payment failed${last.failure_message ? `: ${last.failure_message}` : ''}` })
     } else if (lastPaid && status !== 'Graduated') {
       // A graduate who has stopped paying has usually finished paying, so only flag everyone else
       const sincePaid = nowMs - Date.parse(lastPaid.created_at)
       if (sincePaid > NO_PAYMENT_DAYS * DAY && sincePaid <= RECENT_PAYER_DAYS * DAY) {
-        exceptions.push({ ...base, reason: `No payment in ${Math.floor(sincePaid / DAY)} days` })
+        exceptions.push({ ...base, kind: 'quiet', since: lastPaid.created_at, reason: `No payment in ${Math.floor(sincePaid / DAY)} days` })
       }
     }
   }
