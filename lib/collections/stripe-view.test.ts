@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildStripeView, type PaymentRow } from './stripe-view'
+import { buildStripeView, studentKey, type PaymentRow } from './stripe-view'
 
 const NOW = new Date('2026-10-06T17:00:00Z')
 
@@ -28,7 +28,7 @@ describe('buildStripeView', () => {
     ], NOW)
 
     expect(v.year).toBe(2026)
-    expect(v.monthly.find((m) => m.month === 'Sep')).toEqual({ month: 'Sep', collected: 400, failed: 250 })
+    expect(v.monthly.find((m) => m.month === 'Sep')).toEqual({ month: 'Sep', stripe: 400, other: 0, collected: 400, failed: 250 })
     expect(v.collectedYtd).toBe(900) // the Dec-25 payment is outside the year
     expect(v.thisMonthLabel).toBe('Oct')
     expect(v.collectedThisMonth).toBe(500)
@@ -72,5 +72,37 @@ describe('buildStripeView', () => {
 
     expect(v.failedLast30).toEqual({ count: 1, amount: 300 })
     expect(v.payingStudents).toBe(1)
+  })
+
+  it('merges manual payments into the same student by email and splits them out in the monthly totals', () => {
+    const v = buildStripeView([
+      row({ customer_email: 'a@example.com', amount: 500 }),
+      row({ customer_email: 'A@Example.com ', customer_name: null, amount: 1000, source: 'WFD' }),
+    ], NOW)
+
+    expect(v.students).toHaveLength(1)
+    expect(v.students[0].sources).toEqual(['Stripe', 'WFD'])
+    expect(v.students[0].cells[8]).toEqual({ state: 'paid', amount: 1500 })
+    expect(v.monthly[8]).toMatchObject({ stripe: 500, other: 1000, collected: 1500 })
+    expect(v.collectedOtherYtd).toBe(1000)
+  })
+
+  it('keys students without an email by name, and applies saved statuses', () => {
+    const v = buildStripeView(
+      [row({ customer_email: null, customer_name: 'Lender Student', source: 'Sallie Mae' })],
+      NOW,
+      new Map([[studentKey(null, 'Lender Student'), 'Active' as const]]),
+    )
+    expect(v.students[0].key).toBe('name:Lender Student')
+    expect(v.students[0].status).toBe('Active')
+  })
+
+  it('does not flag a graduate for going quiet, but still flags a graduate whose last payment failed', () => {
+    const quiet = row({ customer_email: 'grad@example.com', created_at: '2026-07-20T15:00:00Z', month: 'Jul-26' })
+    const failed = row({ customer_email: 'grad2@example.com', created_at: '2026-10-01T15:00:00Z', month: 'Oct-26', status: 'failed' })
+    const statuses = new Map([['grad@example.com', 'Graduated' as const], ['grad2@example.com', 'Graduated' as const]])
+
+    expect(buildStripeView([quiet, failed], NOW, statuses).exceptions.map((e) => e.email)).toEqual(['grad2@example.com'])
+    expect(buildStripeView([quiet], NOW).exceptions).toHaveLength(1)
   })
 })
