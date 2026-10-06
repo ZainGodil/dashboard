@@ -7,7 +7,7 @@ export type GridCell = { state: 'paid'; amount: number } | { state: 'missed'; re
 export interface GridRow {
   key: string
   name: string
-  meta: string[] // one value per entry in metaColumns
+  meta: React.ReactNode[] // one value per entry in metaColumns
   cells: GridCell[] // Jan–Dec
 }
 

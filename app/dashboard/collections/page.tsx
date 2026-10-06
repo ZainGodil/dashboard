@@ -1,11 +1,14 @@
 import StatCard from '@/components/ui/StatCard'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllRows } from '@/lib/supabase/paginate'
-import { buildStripeView, type PaymentRow, type StripeView } from '@/lib/collections/stripe-view'
+import { buildStripeView, type PaymentRow, type StripeView, type StudentStatus } from '@/lib/collections/stripe-view'
 import MonthlyCollectionChart from './MonthlyCollectionChart'
 import PaymentGrid from './PaymentGrid'
 import MixBars from './MixBars'
 import StripeSyncButton from './StripeSyncButton'
+import StatusSelect from './StatusSelect'
+import RecordPaymentForm from './RecordPaymentForm'
+import DeleteManualPaymentButton from './DeleteManualPaymentButton'
 import {
   AS_OF, MONTHLY, CLOSED_MONTHS, TOTAL_RECORDS, PAYMENT_MIX, STATUS_MIX,
   SAMPLE_STUDENTS, SAMPLE_EXCEPTIONS, type Flag,
@@ -39,29 +42,87 @@ function relativeTime(iso: string): string {
   return `${Math.round(hrs / 24)}d ago`
 }
 
-async function loadStripe(): Promise<{ view: StripeView | null; lastSync: string | null; error: string | null }> {
-  try {
-    const supabase = createAdminClient()
-    const [rows, { data: log }] = await Promise.all([
-      fetchAllRows<PaymentRow>((from, to) =>
-        supabase
-          .from('stripe_payments')
-          .select('status, amount, amount_refunded, created_at, month, customer_email, customer_name, failure_message')
-          .gte('created_at', '2026-01-01T06:00:00Z')
-          .order('created_at', { ascending: true })
-          .range(from, to)
-      ),
-      supabase.from('sync_log').select('completed_at').eq('source', 'stripe').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
-    ])
-    return { view: rows.length ? buildStripeView(rows, new Date()) : null, lastSync: log?.[0]?.completed_at ?? null, error: null }
-  } catch (err) {
-    // Table not created yet, or Supabase unavailable: fall back to the workbook snapshot
-    return { view: null, lastSync: null, error: err instanceof Error ? err.message : String(err) }
+interface ManualEntry {
+  id: string
+  student_name: string
+  student_email: string | null
+  payer: string
+  amount: number
+  paid_on: string
+  month: string
+  note: string | null
+  created_by: string
+}
+
+interface CollectionsData {
+  view: StripeView | null
+  lastSync: string | null
+  error: string | null // Stripe table missing or unreadable
+  manualReady: boolean // manual_payments and student_status exist (migration 010)
+  manual: ManualEntry[]
+}
+
+const errMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
+async function loadCollections(): Promise<CollectionsData> {
+  const supabase = createAdminClient()
+
+  // Each source is read on its own so one missing table doesn't hide the others
+  const stripe = fetchAllRows<PaymentRow>((from, to) =>
+    supabase
+      .from('stripe_payments')
+      .select('status, amount, amount_refunded, created_at, month, customer_email, customer_name, failure_message')
+      .gte('created_at', '2026-01-01T06:00:00Z')
+      .order('created_at', { ascending: true })
+      .range(from, to)
+  ).then((rows) => ({ rows, error: null as string | null }), (err) => ({ rows: [] as PaymentRow[], error: errMessage(err) }))
+
+  const manual = fetchAllRows<ManualEntry>((from, to) =>
+    supabase
+      .from('manual_payments')
+      .select('id, student_name, student_email, payer, amount, paid_on, month, note, created_by')
+      .is('deleted_at', null)
+      .gte('paid_on', '2026-01-01')
+      .order('paid_on', { ascending: false })
+      .range(from, to)
+  ).then((rows) => ({ rows, ok: true }), () => ({ rows: [] as ManualEntry[], ok: false }))
+
+  const [stripeRes, manualRes, statusRes, logRes] = await Promise.all([
+    stripe,
+    manual,
+    supabase.from('student_status').select('student_key, status'),
+    supabase.from('sync_log').select('completed_at').eq('source', 'stripe').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
+  ])
+
+  const statusByKey = new Map<string, StudentStatus>(
+    (statusRes.data ?? []).map((r: { student_key: string; status: StudentStatus }) => [r.student_key, r.status])
+  )
+  const rows: PaymentRow[] = [
+    ...stripeRes.rows,
+    ...manualRes.rows.map((m) => ({
+      status: 'succeeded' as const,
+      amount: Number(m.amount),
+      amount_refunded: 0,
+      created_at: `${m.paid_on}T18:00:00Z`, // midday in Chicago, so it lands on the date entered
+      month: m.month,
+      customer_email: m.student_email,
+      customer_name: m.student_name,
+      failure_message: null,
+      source: m.payer,
+    })),
+  ]
+
+  return {
+    view: rows.length ? buildStripeView(rows, new Date(), statusByKey) : null,
+    lastSync: logRes.data?.[0]?.completed_at ?? null,
+    error: stripeRes.error,
+    manualReady: manualRes.ok && !statusRes.error,
+    manual: manualRes.rows,
   }
 }
 
 export default async function CollectionsPage() {
-  const { view, lastSync, error } = await loadStripe()
+  const { view, lastSync, error, manualReady, manual } = await loadCollections()
 
   return (
     <div>
@@ -77,7 +138,15 @@ export default async function CollectionsPage() {
       </header>
 
       <div className="p-6 space-y-4">
-        {view ? <LiveView view={view} /> : <SnapshotView stripeError={error} />}
+        {manualReady && (
+          <div className={`${CARD} px-5 py-4`}>
+            <RecordPaymentForm students={(view?.students ?? []).map((s) => ({ name: s.name, email: s.email }))} />
+          </div>
+        )}
+
+        {view ? <LiveView view={view} manualReady={manualReady} /> : <SnapshotView stripeError={error} />}
+
+        {manualReady && manual.length > 0 && <RecordedPayments entries={manual} />}
 
         {/* Workbook snapshot: Stripe has no payment type or student status */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -99,11 +168,16 @@ export default async function CollectionsPage() {
 
 // ── Live: Stripe charges ─────────────────────────────────────────────────────
 
-function LiveView({ view }: { view: StripeView }) {
+function LiveView({ view, manualReady }: { view: StripeView; manualReady: boolean }) {
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard label={`Collected ${view.year}`} value={k(view.collectedYtd)} delta="Stripe, net of refunds" accent="blue" />
+        <StatCard
+          label={`Collected ${view.year}`}
+          value={k(view.collectedYtd)}
+          delta={view.collectedOtherYtd > 0 ? `incl. ${k(view.collectedOtherYtd)} recorded by hand` : 'Stripe, net of refunds'}
+          accent="blue"
+        />
         <StatCard label={`Collected ${view.thisMonthLabel}`} value={k(view.collectedThisMonth)} delta="this month so far" accent="green" />
         <StatCard label="Failed, Last 30 Days" value={String(view.failedLast30.count)} delta={`${money(view.failedLast30.amount)} declined`} deltaDir={view.failedLast30.count ? 'down' : 'neutral'} accent="amber" />
         <StatCard label="Paying Students" value={String(view.payingStudents)} delta="paid in the last 60 days" accent="teal" />
@@ -113,10 +187,11 @@ function LiveView({ view }: { view: StripeView }) {
       <div className={`${CARD} p-5`}>
         <MonthlyCollectionChart
           title={`Monthly Collection ${view.year}`}
-          subtitle="Stripe card and bank payments. WFD, Sallie Mae and other lender payments are not in Stripe."
+          subtitle="Stripe card and bank payments, plus WFD, lender and other payments recorded on this page."
           data={view.monthly}
           series={[
-            { key: 'collected', name: 'Collected', color: '#2563EB' },
+            { key: 'stripe', name: 'Collected via Stripe', color: '#2563EB', stackId: 'collected' },
+            { key: 'other', name: 'Recorded by hand', color: '#0891B2', stackId: 'collected' },
             { key: 'failed', name: 'Failed', color: '#F87171' },
           ]}
         />
@@ -134,14 +209,15 @@ function LiveView({ view }: { view: StripeView }) {
             <table className="w-full border-collapse text-[11px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  {['Student', 'Email', 'Last Successful Payment', 'Flag'].map((h) => <th key={h} className={TH}>{h}</th>)}
+                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag'].map((h) => <th key={h} className={TH}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {view.exceptions.map((r) => (
-                  <tr key={r.email || r.name} className="border-b border-slate-100 hover:bg-slate-50">
+                  <tr key={r.key} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
                     <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
+                    <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
                     <td className="px-4 py-2.5 font-mono text-slate-600">{shortDate(r.lastPaidAt)}</td>
                     <td className="px-4 py-2.5"><span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{r.reason}</span></td>
                   </tr>
@@ -151,7 +227,7 @@ function LiveView({ view }: { view: StripeView }) {
           </div>
         )}
         <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
-          Flags: the student&apos;s latest Stripe charge failed, or they paid within the last 120 days but nothing in the last 45.
+          Flags: the student&apos;s latest Stripe charge failed, or they paid within the last 120 days but nothing in the last 45 (not raised for students marked Graduated).
         </div>
       </div>
 
@@ -163,12 +239,21 @@ function LiveView({ view }: { view: StripeView }) {
           <GridLegend missedLabel="Failed (hover for reason)" noneLabel="No charge" />
         </div>
         <PaymentGrid
-          metaColumns={['Email']}
-          rows={view.students.map((s) => ({ key: s.key, name: s.name, meta: [s.email], cells: s.cells }))}
+          metaColumns={['Email', 'Status', 'Paid Via']}
+          rows={view.students.map((s) => ({
+            key: s.key,
+            name: s.name,
+            meta: [
+              s.email,
+              manualReady ? <StatusSelect key="status" studentKey={s.key} status={s.status} /> : '—',
+              s.sources.join(', '),
+            ],
+            cells: s.cells,
+          }))}
           totalLabel={`${view.year} Total`}
         />
         <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
-          One row per Stripe customer email; students flagged for follow-up are listed first. A month is red only when every charge that month failed.
+          One row per student email (or name, when no email was given); students flagged for follow-up are listed first. A month is red only when every charge that month failed.
         </div>
       </div>
     </>
@@ -255,6 +340,50 @@ function SnapshotView({ stripeError }: { stripeError: string | null }) {
         </div>
       </div>
     </>
+  )
+}
+
+// ── Payments recorded by hand ────────────────────────────────────────────────
+
+function RecordedPayments({ entries }: { entries: ManualEntry[] }) {
+  const shown = entries.slice(0, 25)
+  return (
+    <div className={`${CARD} overflow-hidden`}>
+      <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-3">
+        <span className="font-display text-[13px] font-bold text-slate-900">Recorded Payments</span>
+        <Badge tone="slate">{entries.length} this year</Badge>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              {['Date', 'Student', 'Paid By', 'Amount', 'Note', 'Added By', ''].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((m) => (
+              <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{shortDate(`${m.paid_on}T18:00:00Z`)}</td>
+                <td className="px-4 py-2.5 font-medium text-slate-800">
+                  {m.student_name}
+                  {m.student_email && <span className="block text-[10px] font-normal text-slate-400">{m.student_email}</span>}
+                </td>
+                <td className="px-4 py-2.5 text-slate-600">{m.payer}</td>
+                <td className="px-4 py-2.5 font-mono text-slate-900">{money(Number(m.amount))}</td>
+                <td className="px-4 py-2.5 text-slate-500">{m.note}</td>
+                <td className="px-4 py-2.5 text-slate-400">{m.created_by}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <DeleteManualPaymentButton id={m.id} label={`${money(Number(m.amount))} from ${m.payer} for ${m.student_name}`} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {entries.length > shown.length && (
+        <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">Showing the latest {shown.length} of {entries.length}.</div>
+      )}
+    </div>
   )
 }
 

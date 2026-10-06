@@ -6,6 +6,7 @@ export interface ChartSeries {
   key: string
   name: string
   color: string
+  stackId?: string // series sharing a stackId are drawn as one stacked bar
 }
 
 interface MonthlyCollectionChartProps {
@@ -37,7 +38,7 @@ export default function MonthlyCollectionChart({ title, subtitle, data, series }
             formatter={(value) => <span className="text-slate-500">{value}</span>}
           />
           {series.map((s) => (
-            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} radius={[3, 3, 0, 0]} />
+            <Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} stackId={s.stackId} radius={s.stackId ? 0 : [3, 3, 0, 0]} />
           ))}
         </BarChart>
       </ResponsiveContainer>
