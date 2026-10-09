@@ -7,6 +7,7 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: 'mtd', label: 'MTD' },
   { value: 'last_month', label: 'Last Mo.' },
   { value: '90d', label: '90-Day' },
+  { value: 'half_year', label: 'Half-Yr' },
   { value: 'ytd', label: 'YTD' },
 ]
 

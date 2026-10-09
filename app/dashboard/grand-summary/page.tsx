@@ -27,7 +27,7 @@ function getDateRange90d(): { startDate: string; endDate: string } {
   return { startDate: s.toISOString().split('T')[0], endDate: today.toISOString().split('T')[0] }
 }
 
-const PERIOD_LABELS: Record<Period, string> = { mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }
+const PERIOD_LABELS: Record<Period, string> = { mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', half_year: 'Half-Yr', ytd: 'YTD' }
 const PROGRAMS = ['Digital Marketing', 'UI/UX Design', 'Generative AI Data Analyst', 'Project Management', 'General']
 
 // Canonical source order — matches the Excel sheet column order

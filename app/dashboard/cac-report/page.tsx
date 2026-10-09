@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getMonthsForPeriod, getLast6Months, getLast12Months, type Period } from '@/lib/metrics/periods'
+import { getMonthsForPeriod, getHalfYearMonths, getLast6Months, getLast12Months, type Period } from '@/lib/metrics/periods'
 import StatCard from '@/components/ui/StatCard'
 import GaugeCard from '@/components/charts/GaugeCard'
 import SbuCard from '@/components/ui/SbuCard'
@@ -310,7 +310,10 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const goalMonth = customMonth ?? activeMonths[0] ?? null
   const goalYear = String(today.getFullYear())
 
-  const goalPeriods: string[] = [goalYear]
+  const isHalfYear = period === 'half_year' && !customMonth
+  const halfYearMonths = isHalfYear ? getHalfYearMonths(true) : []
+
+  const goalPeriods: string[] = [goalYear, ...halfYearMonths]
   if (goalMonth) goalPeriods.push(goalMonth)
 
   const { data: goalsRaw } = await supabase
@@ -320,6 +323,23 @@ export default async function CacReportPage({ searchParams }: PageProps) {
 
   const monthlyGoal = (goalsRaw ?? []).find((g) => g.period_type === 'monthly' && g.period === goalMonth) ?? null
   const yearlyGoal  = (goalsRaw ?? []).find((g) => g.period_type === 'yearly'  && g.period === goalYear)  ?? null
+
+  // Half-year goal: sum of the six monthly goals in the half; where none are set,
+  // fall back to half of the yearly goal.
+  let halfYearGoal: GoalRow | null = null
+  if (isHalfYear) {
+    const halfMonthly = (goalsRaw ?? []).filter((g) => g.period_type === 'monthly' && halfYearMonths.includes(g.period))
+    const target = (field: 'spend_target' | 'leads_target' | 'enrollments_target'): number | null => {
+      const set = halfMonthly.filter((g) => g[field] != null)
+      if (set.length) return set.reduce((s, g) => s + Number(g[field]), 0)
+      return yearlyGoal?.[field] != null ? Number(yearlyGoal[field]) / 2 : null
+    }
+    halfYearGoal = {
+      spend_target: target('spend_target'),
+      leads_target: target('leads_target'),
+      enrollments_target: target('enrollments_target'),
+    }
+  }
 
   return (
     <CacReportContent
@@ -344,6 +364,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
       trendCacRows={trendCacRaw ?? []}
       monthlyGoal={monthlyGoal}
       yearlyGoal={yearlyGoal}
+      halfYearGoal={halfYearGoal}
     />
   )
 }
@@ -398,9 +419,12 @@ interface ContentProps {
   avgLtv: number
   enrolledNames: MtdEnrolledContact[]
   trendCacRows: TrendCacRow[]
-  monthlyGoal: { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
-  yearlyGoal:  { spend_target: number | null; leads_target: number | null; enrollments_target: number | null } | null
+  monthlyGoal: GoalRow | null
+  yearlyGoal:  GoalRow | null
+  halfYearGoal: GoalRow | null
 }
+
+interface GoalRow { spend_target: number | null; leads_target: number | null; enrollments_target: number | null }
 
 // ── Content component ────────────────────────────────────────────────────────
 
@@ -408,7 +432,7 @@ function CacReportContent({
   period, customMonth, cacRows, rollingRows, periodSpendRows,
   trendMonths, trendSpendRows, l2eData, yoyData, weeklyData, dailyData, currentMonthLabel,
   salesCycleData, monthlyCacData, bookingRevenueMtd, aov, avgLtv, enrolledNames, trendCacRows,
-  monthlyGoal, yearlyGoal,
+  monthlyGoal, yearlyGoal, halfYearGoal,
 }: ContentProps) {
   const isRolling = period === '90d'
 
@@ -531,7 +555,7 @@ function CacReportContent({
   // Period label — shows month name when navigating via ‹ ›
   const periodLabel = customMonth
     ? (() => { const [mon, yr] = customMonth.split('-'); return `${mon} 20${yr}` })()
-    : ({ mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', ytd: 'YTD' }[period] ?? 'MTD')
+    : ({ mtd: 'MTD', last_month: 'Last Mo.', '90d': '90-Day', half_year: 'Half-Yr', ytd: 'YTD' }[period] ?? 'MTD')
 
   // Gauge values derived from period data (totalLeads / totalEnrollments / totalSpend)
   const gaugeL2E = totalLeads > 0 ? (totalEnrollments / totalLeads) * 100 : 0
@@ -609,7 +633,7 @@ function CacReportContent({
 
         {/* Row 3: Gauges — max driven by goals when set, otherwise hardcoded fallback */}
         {(() => {
-          const goal = period === 'ytd' ? yearlyGoal : monthlyGoal
+          const goal = period === 'ytd' ? yearlyGoal : (halfYearGoal ?? monthlyGoal)
           const spendMax   = goal?.spend_target        ?? 250000
           const leadsMax   = goal?.leads_target        ?? 6000
           const enrollMax  = goal?.enrollments_target  ?? 250
