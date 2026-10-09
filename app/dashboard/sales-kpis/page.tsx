@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchGoals } from '@/lib/hubspot/goals'
 import type { GoalRecord } from '@/lib/hubspot/goals'
-import type { Period } from '@/lib/metrics/periods'
+import { getHalfYearMonths, type Period } from '@/lib/metrics/periods'
 import SalesFilterBar from './SalesFilterBar'
 import BookingsChart from './BookingsChart'
 import BookingsTrendChart from './BookingsTrendChart'
@@ -40,6 +40,7 @@ function getPeriodMonths(period: Period): string[] | null {
   if (period === 'last_month') {
     return [toLabel(new Date(now.getFullYear(), now.getMonth() - 1, 1))]
   }
+  if (period === 'half_year') return getHalfYearMonths()
   if (period === 'ytd') {
     const months: string[] = []
     for (let m = 0; m <= now.getMonth(); m++) {
@@ -77,6 +78,7 @@ const PERIOD_LABELS: Record<Period, string> = {
   mtd: 'MTD',
   last_month: 'Last Mo.',
   '90d': '90-Day',
+  half_year: 'Half-Yr',
   ytd: 'YTD',
 }
 
