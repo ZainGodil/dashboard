@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getHalfYearStartDate, type Period } from '@/lib/metrics/periods'
+import { getHalfYearDateRange, type Period } from '@/lib/metrics/periods'
 import StatCard from '@/components/ui/StatCard'
 import SpendFilterBar from '../SpendFilterBar'
 import CampaignsTable from '@/components/spend/CampaignsTable'
@@ -17,7 +17,7 @@ function getDateRange(period: Period): { startDate: string; endDate: string } {
     return { startDate: s.toISOString().split('T')[0], endDate: todayStr }
   }
   if (period === 'ytd') return { startDate: `${today.getFullYear()}-01-01`, endDate: todayStr }
-  if (period === 'half_year') return { startDate: getHalfYearStartDate(today), endDate: todayStr }
+  if (period === 'half_year') return getHalfYearDateRange(today)
   if (period === 'last_month') {
     const s = new Date(today.getFullYear(), today.getMonth() - 1, 1)
     const e = new Date(today.getFullYear(), today.getMonth(), 0)

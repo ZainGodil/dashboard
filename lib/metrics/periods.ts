@@ -28,21 +28,18 @@ export function getMonthsForPeriod(period: Period): string[] {
   return [] // 90d uses rolling_metrics — handled separately
 }
 
-// Current half-year (H1 = Jan–Jun, H2 = Jul–Dec). To date by default; `full`
-// returns all six months, e.g. for summing monthly goals.
-export function getHalfYearMonths(full = false, now = new Date()): string[] {
-  const startMonth = now.getMonth() < 6 ? 0 : 6
-  const endMonth = full ? startMonth + 5 : now.getMonth()
+// Half-year = first half of the current year: Jan 1 – Jun 30
+export function getHalfYearMonths(now = new Date()): string[] {
   const months: string[] = []
-  for (let m = startMonth; m <= endMonth; m++) {
+  for (let m = 0; m < 6; m++) {
     months.push(toLabel(new Date(now.getFullYear(), m, 1)))
   }
   return months
 }
 
-// First day of the current half-year as YYYY-MM-DD
-export function getHalfYearStartDate(now = new Date()): string {
-  return `${now.getFullYear()}-${now.getMonth() < 6 ? '01' : '07'}-01`
+// Half-year bounds as YYYY-MM-DD
+export function getHalfYearDateRange(now = new Date()): { startDate: string; endDate: string } {
+  return { startDate: `${now.getFullYear()}-01-01`, endDate: `${now.getFullYear()}-06-30` }
 }
 
 export function getPeriodLabel(period: Period): string {

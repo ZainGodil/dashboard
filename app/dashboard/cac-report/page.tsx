@@ -311,7 +311,7 @@ export default async function CacReportPage({ searchParams }: PageProps) {
   const goalYear = String(today.getFullYear())
 
   const isHalfYear = period === 'half_year' && !customMonth
-  const halfYearMonths = isHalfYear ? getHalfYearMonths(true) : []
+  const halfYearMonths = isHalfYear ? getHalfYearMonths() : []
 
   const goalPeriods: string[] = [goalYear, ...halfYearMonths]
   if (goalMonth) goalPeriods.push(goalMonth)

@@ -1,21 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { parseMonthLabel, sortMonthLabelsDesc, getHalfYearMonths, getHalfYearStartDate } from './periods'
+import { parseMonthLabel, sortMonthLabelsDesc, getHalfYearMonths, getHalfYearDateRange } from './periods'
 
-describe('getHalfYearMonths', () => {
-  it('returns H2 months to date in the second half', () => {
+describe('half-year period', () => {
+  it('covers Jan 1 – Jun 30 of the current year, even later in the year', () => {
     const oct = new Date(2026, 9, 9)
-    expect(getHalfYearMonths(false, oct)).toEqual(['Jul-26', 'Aug-26', 'Sep-26', 'Oct-26'])
-    expect(getHalfYearStartDate(oct)).toBe('2026-07-01')
-  })
-
-  it('returns all six months of the half when full is set', () => {
-    expect(getHalfYearMonths(true, new Date(2026, 1, 15))).toEqual(['Jan-26', 'Feb-26', 'Mar-26', 'Apr-26', 'May-26', 'Jun-26'])
-  })
-
-  it('starts H1 in January', () => {
-    const jan = new Date(2027, 0, 3)
-    expect(getHalfYearMonths(false, jan)).toEqual(['Jan-27'])
-    expect(getHalfYearStartDate(jan)).toBe('2027-01-01')
+    expect(getHalfYearMonths(oct)).toEqual(['Jan-26', 'Feb-26', 'Mar-26', 'Apr-26', 'May-26', 'Jun-26'])
+    expect(getHalfYearDateRange(oct)).toEqual({ startDate: '2026-01-01', endDate: '2026-06-30' })
   })
 })
 
