@@ -2,7 +2,8 @@
   "crons": [
     { "path": "/api/sync/hubspot", "schedule": "0 1 * * *" },
     { "path": "/api/sync/ads",     "schedule": "0 2 * * *" },
-    { "path": "/api/sync/stripe",  "schedule": "0 3 * * *" }
+    { "path": "/api/sync/stripe",  "schedule": "0 3 * * *" },
+    { "path": "/api/sync/paycove", "schedule": "0 4 * * *" }
   ],
   "functions": {
     "app/api/sync/hubspot/route.ts": { "maxDuration": 300 }

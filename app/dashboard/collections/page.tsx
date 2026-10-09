@@ -12,6 +12,8 @@ import DeleteManualPaymentButton from './DeleteManualPaymentButton'
 import HandleFlagButton from './HandleFlagButton'
 import ReopenFlagButton from './ReopenFlagButton'
 import { applyActions, chicagoToday, type ExceptionAction, type OpenException, type HandledException } from '@/lib/collections/exception-actions'
+import { buildPlansView, planLabel, type PlanDeal, type PlanPayment, type PlansView } from '@/lib/collections/plans'
+import { paycoveConfig } from '@/lib/paycove/client'
 import {
   AS_OF, MONTHLY, CLOSED_MONTHS, TOTAL_RECORDS, PAYMENT_MIX, STATUS_MIX,
   SAMPLE_STUDENTS, SAMPLE_EXCEPTIONS, type Flag,
@@ -65,6 +67,13 @@ interface CollectionsData {
   manual: ManualEntry[]
   actionsReady: boolean // exception_actions exists (migration 011)
   queue: { open: OpenException[]; handled: HandledException[] }
+  paycove: {
+    ready: boolean // paycove tables exist (migration 012)
+    configured: boolean // PAYCOVE_CLIENT_ID and PAYCOVE_CLIENT_SECRET are set
+    connected: { by: string; at: string } | null
+    lastSync: string | null
+    plans: PlansView | null
+  }
 }
 
 const errMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
@@ -101,12 +110,25 @@ async function loadCollections(): Promise<CollectionsData> {
       .range(from, to)
   ).then((rows) => ({ rows, ok: true }), () => ({ rows: [] as ExceptionAction[], ok: false }))
 
-  const [stripeRes, manualRes, statusRes, logRes, actionsRes] = await Promise.all([
+  const plans = Promise.all([
+    fetchAllRows<PlanDeal>((from, to) =>
+      supabase.from('paycove_deals').select('id, name, status, student_name, student_email, total_amount, remaining_balance').order('id').range(from, to)
+    ),
+    fetchAllRows<PlanPayment>((from, to) =>
+      supabase.from('paycove_payments').select('deal_id, number, due_on, amount, is_paid, payable').order('id').range(from, to)
+    ),
+  ]).then(([deals, payments]) => ({ deals, payments, ok: true }), () => ({ deals: [] as PlanDeal[], payments: [] as PlanPayment[], ok: false }))
+
+  const [stripeRes, manualRes, statusRes, logRes, actionsRes, plansRes, tokenRes, paycoveLogRes] = await Promise.all([
     stripe,
     manual,
     supabase.from('student_status').select('student_key, status'),
     supabase.from('sync_log').select('completed_at').eq('source', 'stripe').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
     actions,
+    plans,
+    // Only whether Paycove is connected, and by whom; the token itself is never read here
+    supabase.from('integration_tokens').select('connected_by, connected_at').eq('provider', 'paycove').maybeSingle(),
+    supabase.from('sync_log').select('completed_at').eq('source', 'paycove').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
   ])
 
   const statusByKey = new Map<string, StudentStatus>(
@@ -128,6 +150,19 @@ async function loadCollections(): Promise<CollectionsData> {
   ]
 
   const view = rows.length ? buildStripeView(rows, new Date(), statusByKey) : null
+  const today = chicagoToday()
+  const planView = plansRes.ok && plansRes.deals.length
+    ? buildPlansView(
+        plansRes.deals.map((d) => ({ ...d, total_amount: d.total_amount === null ? null : Number(d.total_amount), remaining_balance: d.remaining_balance === null ? null : Number(d.remaining_balance) })),
+        plansRes.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+        today,
+        statusByKey,
+      )
+    : null
+
+  // Plan flags join the payment flags; fill in the last successful payment from the payment data
+  const lastPaid = new Map<string, string | null>((view?.students ?? []).map((s): [string, string | null] => [s.key, s.lastPaidAt]))
+  const planExceptions = (planView?.exceptions ?? []).map((e) => ({ ...e, lastPaidAt: lastPaid.get(e.key) ?? null }))
 
   return {
     view,
@@ -136,12 +171,28 @@ async function loadCollections(): Promise<CollectionsData> {
     manualReady: manualRes.ok && !statusRes.error,
     manual: manualRes.rows,
     actionsReady: actionsRes.ok,
-    queue: applyActions(view?.exceptions ?? [], actionsRes.rows, chicagoToday()),
+    queue: applyActions([...(view?.exceptions ?? []), ...planExceptions], actionsRes.rows, today),
+    paycove: {
+      ready: plansRes.ok && !tokenRes.error,
+      configured: paycoveConfig() !== null,
+      connected: tokenRes.data ? { by: tokenRes.data.connected_by, at: tokenRes.data.connected_at } : null,
+      lastSync: paycoveLogRes.data?.[0]?.completed_at ?? null,
+      plans: planView,
+    },
   }
 }
 
-export default async function CollectionsPage() {
-  const { view, lastSync, error, manualReady, manual, actionsReady, queue } = await loadCollections()
+const PAYCOVE_MESSAGES: Record<string, { tone: 'good' | 'bad'; text: string }> = {
+  connected: { tone: 'good', text: 'Paycove is connected. Click Sync Paycove to load the payment plans.' },
+  denied: { tone: 'bad', text: 'Paycove access was not approved, so nothing was connected.' },
+  invalid: { tone: 'bad', text: 'The Paycove approval could not be verified. Please click Connect Paycove again.' },
+  failed: { tone: 'bad', text: 'Paycove approved access, but the connection could not be saved. Check that the Paycove client ID and secret in Vercel are correct, then try again.' },
+  'not-configured': { tone: 'bad', text: 'Paycove is not set up yet: add PAYCOVE_CLIENT_ID and PAYCOVE_CLIENT_SECRET in Vercel, then redeploy.' },
+}
+
+export default async function CollectionsPage({ searchParams }: { searchParams?: { paycove?: string } }) {
+  const { view, lastSync, error, manualReady, manual, actionsReady, queue, paycove } = await loadCollections()
+  const paycoveMessage = searchParams?.paycove ? PAYCOVE_MESSAGES[searchParams.paycove] : undefined
 
   return (
     <div>
@@ -153,17 +204,33 @@ export default async function CollectionsPage() {
           {view ? (lastSync ? `Last Stripe sync ${relativeTime(lastSync)}` : 'Stripe data') : `Master workbook figures as of ${AS_OF}`}
         </span>
         <div className="flex-1" />
+        {paycove.ready && paycove.configured && !paycove.connected && (
+          <a href="/api/paycove/connect" className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+            Connect Paycove
+          </a>
+        )}
+        {paycove.ready && paycove.connected && (
+          <>
+            {paycove.lastSync && <span className="text-[11px] text-slate-400 hidden md:inline">Paycove {relativeTime(paycove.lastSync)}</span>}
+            <StripeSyncButton source="paycove" label="Sync Paycove" unit="plans" />
+          </>
+        )}
         {!error && <StripeSyncButton />}
       </header>
 
       <div className="p-6 space-y-4">
+        {paycoveMessage && (
+          <div className={`rounded-xl border px-4 py-2.5 text-[11px] ${paycoveMessage.tone === 'good' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+            {paycoveMessage.text}
+          </div>
+        )}
         {manualReady && (
           <div className={`${CARD} px-5 py-4`}>
             <RecordPaymentForm students={(view?.students ?? []).map((s) => ({ name: s.name, email: s.email }))} />
           </div>
         )}
 
-        {view ? <LiveView view={view} manualReady={manualReady} actionsReady={actionsReady} queue={queue} /> : <SnapshotView stripeError={error} />}
+        {view ? <LiveView view={view} manualReady={manualReady} actionsReady={actionsReady} queue={queue} plans={paycove.plans} /> : <SnapshotView stripeError={error} />}
 
         {manualReady && manual.length > 0 && <RecordedPayments entries={manual} />}
 
@@ -187,12 +254,18 @@ export default async function CollectionsPage() {
 
 // ── Live: Stripe charges ─────────────────────────────────────────────────────
 
-function LiveView({ view, manualReady, actionsReady, queue }: {
+function LiveView({ view, manualReady, actionsReady, queue, plans }: {
   view: StripeView
   manualReady: boolean
   actionsReady: boolean
   queue: { open: OpenException[]; handled: HandledException[] }
+  plans: PlansView | null
 }) {
+  // Students with a Paycove plan but no payment yet still get a grid row
+  const inGrid = new Set(view.students.map((s) => s.key))
+  const planOnly = (plans?.students ?? []).filter((p) => !inGrid.has(p.key))
+  const emptyMonths = view.students[0]?.cells.map(() => ({ state: 'none' as const })) ?? Array.from({ length: 12 }, () => ({ state: 'none' as const }))
+
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -213,6 +286,15 @@ function LiveView({ view, manualReady, actionsReady, queue }: {
           accent="amber"
         />
       </div>
+
+      {plans && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Still Owed on Plans" value={k(plans.remainingTotal)} delta={`${plans.activePlans} open plan${plans.activePlans === 1 ? '' : 's'} in Paycove`} accent="blue" />
+          <StatCard label="Installments Overdue" value={String(plans.overdueCount)} delta={`${money(plans.overdueAmount)} past due`} deltaDir={plans.overdueCount ? 'down' : 'neutral'} accent="amber" />
+          <StatCard label="Due Next 30 Days" value={k(plans.dueNext30)} delta="unpaid installments coming up" accent="teal" />
+          <StatCard label="Students on Plans" value={String(plans.students.length)} delta={`${plans.students.filter((s) => s.remaining > 0).length} with payments remaining`} accent="green" />
+        </div>
+      )}
 
       <div className={`${CARD} p-5`}>
         <MonthlyCollectionChart
@@ -273,6 +355,7 @@ function LiveView({ view, manualReady, actionsReady, queue }: {
         )}
         <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
           Flags: the student&apos;s latest Stripe charge failed, or they paid within the last 120 days but nothing in the last 45 (not raised for students marked Graduated).
+          {plans && ' From Paycove: a plan installment is past its due date and unpaid, or a student marked Dropped still owes on their plan.'}
           {actionsReady && ' A handled flag comes back on its follow-up date, or when a newer payment fails.'}
         </div>
       </div>
@@ -316,26 +399,41 @@ function LiveView({ view, manualReady, actionsReady, queue }: {
       <div className={`${CARD} overflow-hidden`}>
         <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-display text-[13px] font-bold text-slate-900">Student Payment Grid</span>
-          <Badge tone="slate">{view.students.length} students</Badge>
+          <Badge tone="slate">{view.students.length + planOnly.length} students</Badge>
           <div className="flex-1" />
           <GridLegend missedLabel="Failed (hover for reason)" noneLabel="No charge" />
         </div>
         <PaymentGrid
-          metaColumns={['Email', 'Status', 'Paid Via']}
-          rows={view.students.map((s) => ({
-            key: s.key,
-            name: s.name,
-            meta: [
-              s.email,
-              manualReady ? <StatusSelect key="status" studentKey={s.key} status={s.status} /> : '—',
-              s.sources.join(', '),
-            ],
-            cells: s.cells,
-          }))}
+          metaColumns={plans ? ['Email', 'Status', 'Paid Via', 'Plan'] : ['Email', 'Status', 'Paid Via']}
+          rows={[
+            ...view.students.map((s) => ({
+              key: s.key,
+              name: s.name,
+              meta: [
+                s.email,
+                manualReady ? <StatusSelect key="status" studentKey={s.key} status={s.status} /> : '—',
+                s.sources.join(', '),
+                ...(plans ? [planLabel(plans.byKey.get(s.key))] : []),
+              ],
+              cells: s.cells,
+            })),
+            ...planOnly.map((p) => ({
+              key: p.key,
+              name: p.name,
+              meta: [
+                p.email,
+                manualReady ? <StatusSelect key="status" studentKey={p.key} status={p.status} /> : '—',
+                'No payment yet',
+                planLabel(p),
+              ],
+              cells: emptyMonths,
+            })),
+          ]}
           totalLabel={`${view.year} Total`}
         />
         <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
           One row per student email (or name, when no email was given); students flagged for follow-up are listed first. A month is red only when every charge that month failed.
+          {plans && ' Plan shows installments paid out of the total in Paycove, what is still owed, and the next due date.'}
         </div>
       </div>
     </>

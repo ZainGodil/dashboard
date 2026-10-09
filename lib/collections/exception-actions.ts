@@ -3,7 +3,7 @@ import type { ExceptionRow } from './stripe-view'
 export interface ExceptionAction {
   id: string
   student_key: string
-  flag_kind: 'failed' | 'quiet'
+  flag_kind: 'failed' | 'quiet' | 'overdue'
   flag_since: string
   note: string
   follow_up_on: string | null // YYYY-MM-DD
@@ -46,7 +46,7 @@ export function chicagoToday(now: Date = new Date()): string {
 
 export interface ActionInput {
   student_key: string
-  flag_kind: 'failed' | 'quiet'
+  flag_kind: 'failed' | 'quiet' | 'overdue'
   flag_since: string
   note: string
   follow_up_on: string | null
@@ -61,7 +61,7 @@ export function parseActionInput(body: unknown, today: string): ActionInput | { 
   const followUp = typeof b.follow_up_on === 'string' ? b.follow_up_on.trim() : ''
 
   if (!key || key.length > 320) return { error: 'Missing student.' }
-  if (kind !== 'failed' && kind !== 'quiet') return { error: 'Unknown flag.' }
+  if (kind !== 'failed' && kind !== 'quiet' && kind !== 'overdue') return { error: 'Unknown flag.' }
   if (!since || Number.isNaN(Date.parse(since))) return { error: 'Missing flag date.' }
   if (!note) return { error: 'Add a note saying what was done.' }
   if (note.length > 1000) return { error: 'Note is too long (1,000 characters max).' }

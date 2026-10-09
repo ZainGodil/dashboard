@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 300
 
-type Source = 'ads' | 'hubspot' | 'stripe'
+type Source = 'ads' | 'hubspot' | 'stripe' | 'paycove'
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const source = body.source as string | undefined
 
-  if (source !== 'ads' && source !== 'hubspot' && source !== 'stripe') {
-    return NextResponse.json({ error: 'Invalid source. Must be "ads", "hubspot" or "stripe".' }, { status: 400 })
+  if (source !== 'ads' && source !== 'hubspot' && source !== 'stripe' && source !== 'paycove') {
+    return NextResponse.json({ error: 'Invalid source. Must be "ads", "hubspot", "stripe" or "paycove".' }, { status: 400 })
   }
 
   const validSource: Source = source
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
   const path =
     validSource === 'ads' ? '/api/sync/ads'
     : validSource === 'stripe' ? '/api/sync/stripe'
+    : validSource === 'paycove' ? '/api/sync/paycove'
     : '/api/sync/hubspot?mode=incremental'
 
   const upstream = await fetch(`${origin}${path}`, {
