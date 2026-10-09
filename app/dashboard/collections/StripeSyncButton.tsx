@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 type State = 'idle' | 'syncing' | 'done' | 'error'
 
-export default function StripeSyncButton() {
+export default function StripeSyncButton({ source = 'stripe', label = 'Sync Stripe', unit = 'payments' }: { source?: 'stripe' | 'paycove'; label?: string; unit?: string }) {
   const router = useRouter()
   const [state, setState] = useState<State>('idle')
   const [message, setMessage] = useState('')
@@ -17,12 +17,12 @@ export default function StripeSyncButton() {
       const res = await fetch('/api/sync/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'stripe' }),
+        body: JSON.stringify({ source }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error ?? 'Sync failed')
       setState('done')
-      setMessage(`${data.synced ?? 0} payments`)
+      setMessage(`${data.synced ?? 0} ${unit}`)
       router.refresh()
     } catch (err) {
       setState('error')
@@ -42,7 +42,7 @@ export default function StripeSyncButton() {
         disabled={state === 'syncing'}
         className="text-[11px] font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60"
       >
-        {state === 'syncing' ? 'Syncing…' : 'Sync Stripe'}
+        {state === 'syncing' ? 'Syncing…' : label}
       </button>
     </div>
   )

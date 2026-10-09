@@ -39,7 +39,7 @@ export interface ExceptionRow {
   lastPaidAt: string | null
   flag: 'review'
   reason: string
-  kind: 'failed' | 'quiet'
+  kind: 'failed' | 'quiet' | 'overdue'
   since: string // the event that raised the flag: the failed charge, or the last successful payment
 }
 

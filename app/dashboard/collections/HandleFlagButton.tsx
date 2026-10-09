@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 interface Props {
   studentKey: string
   studentName: string
-  kind: 'failed' | 'quiet'
+  kind: 'failed' | 'quiet' | 'overdue'
   since: string
 }
 
