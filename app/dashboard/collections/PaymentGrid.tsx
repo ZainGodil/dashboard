@@ -66,6 +66,27 @@ export default function PaymentGrid({ metaColumns, rows, totalLabel }: { metaCol
             )
           })}
         </tbody>
+        {rows.length > 0 && (
+          <tfoot>
+            <tr className="bg-slate-50 border-t-2 border-slate-200">
+              <td colSpan={1 + metaColumns.length} className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">Monthly total</td>
+              {MONTHS.map((m, i) => {
+                const paid = rows.reduce((sum, r) => {
+                  const c = r.cells[i]
+                  return sum + (c && c.state === 'paid' ? c.amount : 0)
+                }, 0)
+                return (
+                  <td key={m} className="px-0.5 py-2.5 text-center font-mono text-[10px] font-semibold text-slate-900 whitespace-nowrap" title={`${m} · Total paid ${money(paid)}`}>
+                    {paid > 0 ? money(paid) : ''}
+                  </td>
+                )
+              })}
+              <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
+                {money(rows.reduce((sum, r) => sum + r.cells.reduce((s, c) => s + (c.state === 'paid' ? c.amount : 0), 0), 0))}
+              </td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   )
