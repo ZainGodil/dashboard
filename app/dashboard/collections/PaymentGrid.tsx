@@ -12,6 +12,7 @@ export interface GridRow {
   key: string
   name: string
   meta: React.ReactNode[] // one value per entry in metaColumns
+  search?: string // text the grid's search box matches (defaults to the name)
   cells: GridCell[] // Jan–Dec
 }
 
