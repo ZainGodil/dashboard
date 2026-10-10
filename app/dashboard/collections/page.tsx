@@ -6,6 +6,8 @@ import MonthlyCollectionChart from './MonthlyCollectionChart'
 import PaymentGrid from './PaymentGrid'
 import MixBars from './MixBars'
 import StripeSyncButton from './StripeSyncButton'
+import StudentGridCard from './StudentGridCard'
+import { bookingsByEmail } from '@/lib/collections/bookings'
 import StatusSelect from './StatusSelect'
 import RecordPaymentForm from './RecordPaymentForm'
 import DeleteManualPaymentButton from './DeleteManualPaymentButton'
@@ -36,6 +38,13 @@ const shortDate = (iso: string | null) =>
 function Badge({ children, tone }: { children: React.ReactNode; tone: 'amber' | 'slate' | 'emerald' }) {
   const tones = { amber: 'bg-amber-100 text-amber-700', slate: 'bg-slate-100 text-slate-500', emerald: 'bg-emerald-100 text-emerald-700' }
   return <span className={`text-[9px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded-full ${tones[tone]}`}>{children}</span>
+}
+
+// Short badge for the flag, with the longer explanation (e.g. the bank's decline reason) shown underneath
+function flagText(r: { kind: 'failed' | 'quiet' | 'overdue'; reason: string }): { label: string; detail: string | null } {
+  if (r.kind === 'failed') return { label: 'Payment failed', detail: r.reason.replace(/^Last payment failed:?\s*/, '') || null }
+  if (r.kind === 'overdue') return { label: r.reason.startsWith('Dropped') ? 'Dropped, still owes' : 'Installments overdue', detail: r.reason }
+  return { label: r.reason, detail: null }
 }
 
 function relativeTime(iso: string): string {
@@ -74,6 +83,7 @@ interface CollectionsData {
     lastSync: string | null
     plans: PlansView | null
   }
+  bookings: Map<string, number> // booking amount (enrollments.deal_amount) per lower-cased email
 }
 
 const errMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
@@ -119,7 +129,16 @@ async function loadCollections(): Promise<CollectionsData> {
     ),
   ]).then(([deals, payments]) => ({ deals, payments, ok: true }), () => ({ deals: [] as PlanDeal[], payments: [] as PlanPayment[], ok: false }))
 
-  const [stripeRes, manualRes, statusRes, logRes, actionsRes, plansRes, tokenRes, paycoveLogRes] = await Promise.all([
+  const bookingsLoad = Promise.all([
+    fetchAllRows<{ hubspot_contact_id: string; deal_amount: number | null }>((from, to) =>
+      supabase.from('enrollments').select('hubspot_contact_id, deal_amount').order('hubspot_contact_id').range(from, to)
+    ),
+    fetchAllRows<{ hubspot_id: string; email: string | null }>((from, to) =>
+      supabase.from('hubspot_contact_emails').select('hubspot_id, email').order('hubspot_id').range(from, to)
+    ),
+  ]).then(([enrollments, emails]) => bookingsByEmail(enrollments, emails), () => new Map<string, number>())
+
+  const [stripeRes, manualRes, statusRes, logRes, actionsRes, plansRes, tokenRes, paycoveLogRes, bookings] = await Promise.all([
     stripe,
     manual,
     supabase.from('student_status').select('student_key, status'),
@@ -129,6 +148,7 @@ async function loadCollections(): Promise<CollectionsData> {
     // Only whether Paycove is connected, and by whom; the token itself is never read here
     supabase.from('integration_tokens').select('connected_by, connected_at').eq('provider', 'paycove').maybeSingle(),
     supabase.from('sync_log').select('completed_at').eq('source', 'paycove').eq('status', 'success').order('completed_at', { ascending: false }).limit(1),
+    bookingsLoad,
   ])
 
   const statusByKey = new Map<string, StudentStatus>(
@@ -179,6 +199,7 @@ async function loadCollections(): Promise<CollectionsData> {
       lastSync: paycoveLogRes.data?.[0]?.completed_at ?? null,
       plans: planView,
     },
+    bookings,
   }
 }
 
@@ -191,7 +212,7 @@ const PAYCOVE_MESSAGES: Record<string, { tone: 'good' | 'bad'; text: string }> =
 }
 
 export default async function CollectionsPage({ searchParams }: { searchParams?: { paycove?: string } }) {
-  const { view, lastSync, error, manualReady, manual, actionsReady, queue, paycove } = await loadCollections()
+  const { view, lastSync, error, manualReady, manual, actionsReady, queue, paycove, bookings } = await loadCollections()
   const paycoveMessage = searchParams?.paycove ? PAYCOVE_MESSAGES[searchParams.paycove] : undefined
 
   return (
@@ -230,7 +251,7 @@ export default async function CollectionsPage({ searchParams }: { searchParams?:
           </div>
         )}
 
-        {view ? <LiveView view={view} manualReady={manualReady} actionsReady={actionsReady} queue={queue} plans={paycove.plans} /> : <SnapshotView stripeError={error} />}
+        {view ? <LiveView view={view} manualReady={manualReady} actionsReady={actionsReady} queue={queue} plans={paycove.plans} bookings={bookings} /> : <SnapshotView stripeError={error} />}
 
         {manualReady && manual.length > 0 && <RecordedPayments entries={manual} />}
 
@@ -254,12 +275,18 @@ export default async function CollectionsPage({ searchParams }: { searchParams?:
 
 // ── Live: Stripe charges ─────────────────────────────────────────────────────
 
-function LiveView({ view, manualReady, actionsReady, queue, plans }: {
+function bookingText(bookings: Map<string, number>, email: string): string {
+  const amount = email ? bookings.get(email.trim().toLowerCase()) : undefined
+  return amount === undefined ? '—' : money(amount)
+}
+
+function LiveView({ view, manualReady, actionsReady, queue, plans, bookings }: {
   view: StripeView
   manualReady: boolean
   actionsReady: boolean
   queue: { open: OpenException[]; handled: HandledException[] }
   plans: PlansView | null
+  bookings: Map<string, number>
 }) {
   // Students with a Paycove plan but no payment yet still get a grid row
   const inGrid = new Set(view.students.map((s) => s.key))
@@ -306,6 +333,7 @@ function LiveView({ view, manualReady, actionsReady, queue, plans }: {
             { key: 'other', name: 'Recorded by hand', color: '#0891B2', stackId: 'collected' },
             { key: 'failed', name: 'Failed', color: '#F87171' },
           ]}
+          total={{ label: 'Total collected', keys: ['stripe', 'other'] }}
         />
       </div>
 
@@ -319,36 +347,43 @@ function LiveView({ view, manualReady, actionsReady, queue, plans }: {
             Nothing to follow up{queue.handled.length ? `; ${queue.handled.length} handled below` : ': no failed last payments and no paying student quiet for 45+ days'}.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          // Fixed height with its own scroll bar; the column headings stay visible while scrolling
+          <div className="max-h-[520px] overflow-auto">
             <table className="w-full border-collapse text-[11px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag', ...(actionsReady ? [''] : [])].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
+                <tr className="border-b border-slate-200">
+                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag', ...(actionsReady ? [''] : [])].map((h, i) => (
+                    <th key={h || i} className={`${TH} sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_#E2E8F0]`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {queue.open.map((r) => (
-                  <tr key={`${r.key}:${r.kind}`} className="border-b border-slate-100 hover:bg-slate-50 align-top">
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
-                    <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
-                    <td className="px-4 py-2.5 font-mono text-slate-600">{shortDate(r.lastPaidAt)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{r.reason}</span>
-                      {r.followUpDue && (
-                        <div className="mt-1.5 text-[10px] text-amber-700">
-                          Follow-up due {shortDate(`${r.followUpDue.follow_up_on}T18:00:00Z`)}: {r.followUpDue.note}
-                          <span className="text-slate-400"> · {r.followUpDue.created_by}</span>
-                        </div>
-                      )}
-                    </td>
-                    {actionsReady && (
-                      <td className="px-4 py-2 text-right">
-                        <HandleFlagButton studentKey={r.key} studentName={r.name} kind={r.kind} since={r.since} />
+                {queue.open.map((r) => {
+                  const { label, detail } = flagText(r)
+                  return (
+                    <tr key={`${r.key}:${r.kind}`} className="border-b border-slate-100 hover:bg-slate-50 align-top">
+                      <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
+                      <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{shortDate(r.lastPaidAt)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-block whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{label}</span>
+                        {detail && <div className="mt-1 max-w-[420px] text-[10px] leading-snug text-slate-500 line-clamp-2" title={detail}>{detail}</div>}
+                        {r.followUpDue && (
+                          <div className="mt-1.5 text-[10px] text-amber-700">
+                            Follow-up due {shortDate(`${r.followUpDue.follow_up_on}T18:00:00Z`)}: {r.followUpDue.note}
+                            <span className="text-slate-400"> · {r.followUpDue.created_by}</span>
+                          </div>
+                        )}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      {actionsReady && (
+                        <td className="px-4 py-2 text-right">
+                          <HandleFlagButton studentKey={r.key} studentName={r.name} kind={r.kind} since={r.since} />
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -396,46 +431,47 @@ function LiveView({ view, manualReady, actionsReady, queue, plans }: {
         </div>
       )}
 
-      <div className={`${CARD} overflow-hidden`}>
-        <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-display text-[13px] font-bold text-slate-900">Student Payment Grid</span>
-          <Badge tone="slate">{view.students.length + planOnly.length} students</Badge>
-          <div className="flex-1" />
-          <GridLegend missedLabel="Failed (hover for reason)" noneLabel="No charge" />
-        </div>
-        <PaymentGrid
-          metaColumns={plans ? ['Email', 'Status', 'Paid Via', 'Plan'] : ['Email', 'Status', 'Paid Via']}
-          rows={[
-            ...view.students.map((s) => ({
-              key: s.key,
-              name: s.name,
-              meta: [
-                s.email,
-                manualReady ? <StatusSelect key="status" studentKey={s.key} status={s.status} /> : '—',
-                s.sources.join(', '),
-                ...(plans ? [planLabel(plans.byKey.get(s.key))] : []),
-              ],
-              cells: s.cells,
-            })),
-            ...planOnly.map((p) => ({
-              key: p.key,
-              name: p.name,
-              meta: [
-                p.email,
-                manualReady ? <StatusSelect key="status" studentKey={p.key} status={p.status} /> : '—',
-                'No payment yet',
-                planLabel(p),
-              ],
-              cells: emptyMonths,
-            })),
-          ]}
-          totalLabel={`${view.year} Total`}
-        />
-        <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">
-          One row per student email (or name, when no email was given); students flagged for follow-up are listed first. A month is red only when every charge that month failed.
-          {plans && ' Plan shows installments paid out of the total in Paycove, what is still owed, and the next due date.'}
-        </div>
-      </div>
+      <StudentGridCard
+        title="Student Payment Grid"
+        legend={<GridLegend missedLabel="Failed (hover for reason)" noneLabel="No charge" />}
+        metaColumns={['Email', 'Status', 'Paid Via', 'Booking', ...(plans ? ['Plan'] : [])]}
+        rows={[
+          ...view.students.map((s) => ({
+            key: s.key,
+            name: s.name,
+            search: `${s.name} ${s.email}`,
+            meta: [
+              s.email,
+              manualReady ? <StatusSelect key="status" studentKey={s.key} status={s.status} /> : '—',
+              s.sources.join(', '),
+              bookingText(bookings, s.email),
+              ...(plans ? [planLabel(plans.byKey.get(s.key))] : []),
+            ],
+            cells: s.cells,
+          })),
+          ...planOnly.map((p) => ({
+            key: p.key,
+            name: p.name,
+            search: `${p.name} ${p.email}`,
+            meta: [
+              p.email,
+              manualReady ? <StatusSelect key="status" studentKey={p.key} status={p.status} /> : '—',
+              'No payment yet',
+              bookingText(bookings, p.email),
+              planLabel(p),
+            ],
+            cells: emptyMonths,
+          })),
+        ]}
+        totalLabel={`${view.year} Total`}
+        footnote={
+          <>
+            One row per student email (or name, when no email was given); students flagged for follow-up are listed first. A month is red only when every charge that month failed.
+            {' Booking is the enrollment deal amount from HubSpot (the same figure as Bookings on the CAC report), matched by email.'}
+            {plans && ' Plan shows installments paid out of the total in Paycove, what is still owed, and the next due date.'}
+          </>
+        }
+      />
     </>
   )
 }

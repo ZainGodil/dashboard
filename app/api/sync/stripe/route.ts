@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { fetchChargesSince, toPaymentRecord } from '@/lib/stripe/charges'
+import { refreshEnrollmentEmails } from '@/lib/collections/bookings'
 
 export const maxDuration = 300
 
@@ -50,7 +51,18 @@ export async function GET(req: NextRequest) {
     }
 
     await writeSyncLog(supabase, startedAt, records.length, 'success', null)
-    return NextResponse.json({ mode: full ? 'full' : 'recent', since: since.toISOString(), synced: records.length })
+
+    // Keep the student emails behind the Collections "Booking" column current. Best effort:
+    // a HubSpot problem here never fails the Stripe sync.
+    let bookingEmails: number | string = 0
+    try {
+      bookingEmails = await refreshEnrollmentEmails(supabase)
+    } catch (err) {
+      bookingEmails = `skipped: ${err instanceof Error ? err.message : String(err)}`
+      console.warn('[sync/stripe] booking emails', bookingEmails)
+    }
+
+    return NextResponse.json({ mode: full ? 'full' : 'recent', since: since.toISOString(), synced: records.length, bookingEmails })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[sync/stripe] failed:', message)
