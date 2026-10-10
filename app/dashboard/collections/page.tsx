@@ -38,6 +38,13 @@ function Badge({ children, tone }: { children: React.ReactNode; tone: 'amber' | 
   return <span className={`text-[9px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded-full ${tones[tone]}`}>{children}</span>
 }
 
+// Short badge for the flag, with the longer explanation (e.g. the bank's decline reason) shown underneath
+function flagText(r: { kind: 'failed' | 'quiet' | 'overdue'; reason: string }): { label: string; detail: string | null } {
+  if (r.kind === 'failed') return { label: 'Payment failed', detail: r.reason.replace(/^Last payment failed:?\s*/, '') || null }
+  if (r.kind === 'overdue') return { label: r.reason.startsWith('Dropped') ? 'Dropped, still owes' : 'Installments overdue', detail: r.reason }
+  return { label: r.reason, detail: null }
+}
+
 function relativeTime(iso: string): string {
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60000)
   if (mins < 1) return 'just now'
@@ -319,36 +326,43 @@ function LiveView({ view, manualReady, actionsReady, queue, plans }: {
             Nothing to follow up{queue.handled.length ? `; ${queue.handled.length} handled below` : ': no failed last payments and no paying student quiet for 45+ days'}.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          // Fixed height with its own scroll bar; the column headings stay visible while scrolling
+          <div className="max-h-[520px] overflow-auto">
             <table className="w-full border-collapse text-[11px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag', ...(actionsReady ? [''] : [])].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
+                <tr className="border-b border-slate-200">
+                  {['Student', 'Email', 'Status', 'Last Successful Payment', 'Flag', ...(actionsReady ? [''] : [])].map((h, i) => (
+                    <th key={h || i} className={`${TH} sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_#E2E8F0]`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {queue.open.map((r) => (
-                  <tr key={`${r.key}:${r.kind}`} className="border-b border-slate-100 hover:bg-slate-50 align-top">
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
-                    <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
-                    <td className="px-4 py-2.5 font-mono text-slate-600">{shortDate(r.lastPaidAt)}</td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{r.reason}</span>
-                      {r.followUpDue && (
-                        <div className="mt-1.5 text-[10px] text-amber-700">
-                          Follow-up due {shortDate(`${r.followUpDue.follow_up_on}T18:00:00Z`)}: {r.followUpDue.note}
-                          <span className="text-slate-400"> · {r.followUpDue.created_by}</span>
-                        </div>
-                      )}
-                    </td>
-                    {actionsReady && (
-                      <td className="px-4 py-2 text-right">
-                        <HandleFlagButton studentKey={r.key} studentName={r.name} kind={r.kind} since={r.since} />
+                {queue.open.map((r) => {
+                  const { label, detail } = flagText(r)
+                  return (
+                    <tr key={`${r.key}:${r.kind}`} className="border-b border-slate-100 hover:bg-slate-50 align-top">
+                      <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{r.email}</td>
+                      <td className="px-4 py-1.5">{manualReady ? <StatusSelect studentKey={r.key} status={r.status} /> : <span className="text-slate-400">—</span>}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{shortDate(r.lastPaidAt)}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-block whitespace-nowrap text-[10px] font-semibold px-2 py-0.5 rounded-full ${FLAG_STYLE[r.flag]}`}>{label}</span>
+                        {detail && <div className="mt-1 max-w-[420px] text-[10px] leading-snug text-slate-500 line-clamp-2" title={detail}>{detail}</div>}
+                        {r.followUpDue && (
+                          <div className="mt-1.5 text-[10px] text-amber-700">
+                            Follow-up due {shortDate(`${r.followUpDue.follow_up_on}T18:00:00Z`)}: {r.followUpDue.note}
+                            <span className="text-slate-400"> · {r.followUpDue.created_by}</span>
+                          </div>
+                        )}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      {actionsReady && (
+                        <td className="px-4 py-2 text-right">
+                          <HandleFlagButton studentKey={r.key} studentName={r.name} kind={r.kind} since={r.since} />
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

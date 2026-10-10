@@ -2,6 +2,10 @@ import { MONTHS } from './data'
 
 const money = (v: number) => `$${Math.round(v).toLocaleString()}`
 
+// Pinned while the grid scrolls; the inset shadow stands in for the border, which sticky cells drop
+const STICKY_HEAD = 'sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_#E2E8F0]'
+const STICKY_FOOT = 'sticky bottom-0 z-10 bg-slate-50 shadow-[inset_0_2px_0_#E2E8F0]'
+
 export type GridCell = { state: 'paid'; amount: number } | { state: 'missed'; reason?: string } | { state: 'none' }
 
 export interface GridRow {
@@ -13,17 +17,18 @@ export interface GridRow {
 
 export default function PaymentGrid({ metaColumns, rows, totalLabel }: { metaColumns: string[]; rows: GridRow[]; totalLabel: string }) {
   return (
-    <div className="overflow-x-auto">
+    // Fixed height with its own scroll bar; headings stay at the top and the totals row at the bottom
+    <div className="max-h-[600px] overflow-auto">
       <table className="w-full border-collapse text-[11px]">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
+          <tr>
             {['Student', ...metaColumns].map((h) => (
-              <th key={h} className="px-3 py-2.5 text-left text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap">{h}</th>
+              <th key={h} className={`px-3 py-2.5 text-left text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap ${STICKY_HEAD}`}>{h}</th>
             ))}
             {MONTHS.map((m) => (
-              <th key={m} className="px-1 py-2.5 text-center text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold">{m}</th>
+              <th key={m} className={`px-1 py-2.5 text-center text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold ${STICKY_HEAD}`}>{m}</th>
             ))}
-            <th className="px-3 py-2.5 text-right text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap">{totalLabel}</th>
+            <th className={`px-3 py-2.5 text-right text-[10px] uppercase tracking-[0.7px] text-slate-400 font-semibold whitespace-nowrap ${STICKY_HEAD}`}>{totalLabel}</th>
           </tr>
         </thead>
         <tbody>
@@ -68,20 +73,20 @@ export default function PaymentGrid({ metaColumns, rows, totalLabel }: { metaCol
         </tbody>
         {rows.length > 0 && (
           <tfoot>
-            <tr className="bg-slate-50 border-t-2 border-slate-200">
-              <td colSpan={1 + metaColumns.length} className="px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap">Monthly total</td>
+            <tr>
+              <td colSpan={1 + metaColumns.length} className={`px-3 py-2.5 font-bold text-slate-900 whitespace-nowrap ${STICKY_FOOT}`}>Monthly total</td>
               {MONTHS.map((m, i) => {
                 const paid = rows.reduce((sum, r) => {
                   const c = r.cells[i]
                   return sum + (c && c.state === 'paid' ? c.amount : 0)
                 }, 0)
                 return (
-                  <td key={m} className="px-0.5 py-2.5 text-center font-mono text-[10px] font-semibold text-slate-900 whitespace-nowrap" title={`${m} · Total paid ${money(paid)}`}>
+                  <td key={m} className={`px-0.5 py-2.5 text-center font-mono text-[10px] font-semibold text-slate-900 whitespace-nowrap ${STICKY_FOOT}`} title={`${m} · Total paid ${money(paid)}`}>
                     {paid > 0 ? money(paid) : ''}
                   </td>
                 )
               })}
-              <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
+              <td className={`px-3 py-2.5 text-right font-mono font-bold text-slate-900 ${STICKY_FOOT}`}>
                 {money(rows.reduce((sum, r) => sum + r.cells.reduce((s, c) => s + (c.state === 'paid' ? c.amount : 0), 0), 0))}
               </td>
             </tr>
