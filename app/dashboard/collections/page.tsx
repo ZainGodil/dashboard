@@ -561,44 +561,58 @@ function SnapshotView({ stripeError }: { stripeError: string | null }) {
 
 // ── Payments recorded by hand ────────────────────────────────────────────────
 
+// Imported rows carry a long system note and author; show a short version (full text on hover)
+function recordedNote(m: ManualEntry): { note: string; by: string } {
+  if (m.created_by.startsWith('import:')) {
+    const row = /row (\d+)/.exec(m.note ?? '')?.[1]
+    return { note: row ? `Workbook row ${row}` : 'Imported from the workbook', by: 'Workbook import' }
+  }
+  return { note: m.note ?? '', by: m.created_by }
+}
+
 function RecordedPayments({ entries }: { entries: ManualEntry[] }) {
-  const shown = entries.slice(0, 25)
+  const total = entries.reduce((sum, m) => sum + Number(m.amount), 0)
   return (
     <div className={`${CARD} overflow-hidden`}>
       <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-3">
         <span className="font-display text-[13px] font-bold text-slate-900">Recorded Payments</span>
-        <Badge tone="slate">{entries.length} this year</Badge>
+        <Badge tone="slate">{entries.length} this year · {money(total)}</Badge>
       </div>
-      <div className="overflow-x-auto">
+      {/* Fixed height with its own scroll bar; the column headings stay visible while scrolling */}
+      <div className="max-h-[420px] overflow-auto">
         <table className="w-full border-collapse text-[11px]">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              {['Date', 'Student', 'Paid By', 'Amount', 'Note', 'Added By', ''].map((h, i) => <th key={h || i} className={TH}>{h}</th>)}
+            <tr>
+              {['Date', 'Student', 'Paid By', 'Amount', 'Note', 'Added By', ''].map((h, i) => (
+                <th key={h || i} className={`${TH} ${h === 'Amount' ? 'text-right' : ''} sticky top-0 z-10 bg-slate-50 shadow-[inset_0_-1px_0_#E2E8F0]`}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {shown.map((m) => (
-              <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{shortDate(`${m.paid_on}T18:00:00Z`)}</td>
-                <td className="px-4 py-2.5 font-medium text-slate-800">
-                  {m.student_name}
-                  {m.student_email && <span className="block text-[10px] font-normal text-slate-400">{m.student_email}</span>}
-                </td>
-                <td className="px-4 py-2.5 text-slate-600">{m.payer}</td>
-                <td className="px-4 py-2.5 font-mono text-slate-900">{money(Number(m.amount))}</td>
-                <td className="px-4 py-2.5 text-slate-500">{m.note}</td>
-                <td className="px-4 py-2.5 text-slate-400">{m.created_by}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <DeleteManualPaymentButton id={m.id} label={`${money(Number(m.amount))} from ${m.payer} for ${m.student_name}`} />
-                </td>
-              </tr>
-            ))}
+            {entries.map((m) => {
+              const { note, by } = recordedNote(m)
+              return (
+                <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-mono text-slate-600 whitespace-nowrap">{shortDate(`${m.paid_on}T18:00:00Z`)}</td>
+                  <td className="px-4 py-2.5 font-medium text-slate-800 whitespace-nowrap">
+                    {m.student_name}
+                    {m.student_email && <span className="block text-[10px] font-normal text-slate-400">{m.student_email}</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">{m.payer}</td>
+                  <td className="px-4 py-2.5 font-mono text-slate-900 text-right whitespace-nowrap">{money(Number(m.amount))}</td>
+                  <td className="px-4 py-2.5 text-slate-500 max-w-[320px]">
+                    <div className="truncate" title={m.note ?? undefined}>{note || '—'}</div>
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-400 whitespace-nowrap" title={m.created_by}>{by}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <DeleteManualPaymentButton id={m.id} label={`${money(Number(m.amount))} from ${m.payer} for ${m.student_name}`} />
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
-      {entries.length > shown.length && (
-        <div className="px-5 py-2.5 text-[10px] text-slate-400 border-t border-slate-100">Showing the latest {shown.length} of {entries.length}.</div>
-      )}
     </div>
   )
 }
