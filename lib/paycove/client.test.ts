@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { toIsoDate, toDealRows, fetchDeals, authorizeUrl, type PaycoveDeal } from './client'
+import { toIsoDate, toDealRows, fetchDeals, authorizeUrl, paycoveApiToken, type PaycoveDeal } from './client'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -85,5 +85,21 @@ describe('authorizeUrl', () => {
     expect(url.searchParams.get('client_id')).toBe('27')
     expect(url.searchParams.get('response_type')).toBe('code')
     expect(url.searchParams.get('state')).toBe('abc')
+  })
+})
+
+describe('paycoveApiToken', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('reads PAYCOVE_API_TOKEN, trimming spaces and a pasted "Bearer " prefix', () => {
+    vi.stubEnv('PAYCOVE_API_TOKEN', '  Bearer eyJabc.def  ')
+    expect(paycoveApiToken()).toBe('eyJabc.def')
+    vi.stubEnv('PAYCOVE_API_TOKEN', 'eyJxyz')
+    expect(paycoveApiToken()).toBe('eyJxyz')
+  })
+
+  it('is null when not set or blank', () => {
+    vi.stubEnv('PAYCOVE_API_TOKEN', '   ')
+    expect(paycoveApiToken()).toBeNull()
   })
 })

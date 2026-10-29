@@ -15,7 +15,7 @@ import HandleFlagButton from './HandleFlagButton'
 import ReopenFlagButton from './ReopenFlagButton'
 import { applyActions, chicagoToday, type ExceptionAction, type OpenException, type HandledException } from '@/lib/collections/exception-actions'
 import { buildPlansView, planLabel, type PlanDeal, type PlanPayment, type PlansView } from '@/lib/collections/plans'
-import { paycoveConfig } from '@/lib/paycove/client'
+import { paycoveApiToken, paycoveConfig } from '@/lib/paycove/client'
 import {
   AS_OF, MONTHLY, CLOSED_MONTHS, TOTAL_RECORDS, PAYMENT_MIX, STATUS_MIX,
   SAMPLE_STUDENTS, SAMPLE_EXCEPTIONS, type Flag,
@@ -195,7 +195,10 @@ async function loadCollections(): Promise<CollectionsData> {
     paycove: {
       ready: plansRes.ok && !tokenRes.error,
       configured: paycoveConfig() !== null,
-      connected: tokenRes.data ? { by: tokenRes.data.connected_by, at: tokenRes.data.connected_at } : null,
+      // Connected by an API token in Vercel, or by someone clicking Connect Paycove
+      connected: paycoveApiToken()
+        ? { by: 'API token', at: '' }
+        : tokenRes.data ? { by: tokenRes.data.connected_by, at: tokenRes.data.connected_at } : null,
       lastSync: paycoveLogRes.data?.[0]?.completed_at ?? null,
       plans: planView,
     },

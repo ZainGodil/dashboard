@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { fetchContacts, fetchDeals, toDealRows } from '@/lib/paycove/client'
+import { fetchContacts, fetchDeals, paycoveApiToken, toDealRows } from '@/lib/paycove/client'
 
 export const maxDuration = 300
 
@@ -31,11 +31,13 @@ export async function GET(req: NextRequest) {
       .eq('provider', 'paycove')
       .maybeSingle()
     if (tokenError) throw new Error(`integration_tokens: ${tokenError.message}`)
-    if (!tokenRow?.access_token) {
-      return NextResponse.json({ error: 'Paycove is not connected yet. Click Connect Paycove on the Collections page.' }, { status: 400 })
+    // An API token set in Vercel takes precedence over one saved by Connect Paycove
+    const token = paycoveApiToken() ?? tokenRow?.access_token
+    if (!token) {
+      return NextResponse.json({ error: 'Paycove is not connected yet. Add PAYCOVE_API_TOKEN in Vercel, or click Connect Paycove.' }, { status: 400 })
     }
 
-    const [deals, contacts] = await Promise.all([fetchDeals(tokenRow.access_token), fetchContacts(tokenRow.access_token)])
+    const [deals, contacts] = await Promise.all([fetchDeals(token), fetchContacts(token)])
     const syncedAt = new Date().toISOString()
     const { dealRows, paymentRows } = toDealRows(deals, contacts, syncedAt)
 
