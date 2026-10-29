@@ -12,6 +12,13 @@ export function paycoveConfig() {
   return clientId && clientSecret ? { clientId, clientSecret } : null
 }
 
+// A ready-made API token issued by Paycove, set in Vercel; used instead of the Connect Paycove flow.
+// Accepts the bare token or one pasted with a leading "Bearer ".
+export function paycoveApiToken(): string | null {
+  const t = process.env.PAYCOVE_API_TOKEN?.trim().replace(/^Bearer\s+/i, '')
+  return t ? t : null
+}
+
 // Must match the redirect URL registered on the Paycove API client exactly
 export function redirectUri(origin: string): string {
   return process.env.PAYCOVE_REDIRECT_URI ?? `${origin}/api/paycove/callback`
